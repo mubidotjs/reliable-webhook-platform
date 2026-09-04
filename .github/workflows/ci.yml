@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: reliable_webhooks
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d reliable_webhooks"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reliable_webhooks?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/reliable_webhooks?schema=public
+      BETTER_AUTH_SECRET: ci-only-secret-with-at-least-thirty-two-characters
+      BETTER_AUTH_URL: http://localhost:3000
+      GITHUB_CLIENT_ID: ci-not-used
+      GITHUB_CLIENT_SECRET: ci-not-used
+      ENCRYPTION_KEY_VERSION: v1
+      ENCRYPTION_KEY_V1: Y2ktb25seS0zMi1ieXRlLWtleS1wbGFjZWhvbGRlcg
+      QUEUE_ADAPTER: local
+      RECEIVER_URL: http://localhost:4000
+      LOG_LEVEL: info
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm db:validate
+      - run: pnpm db:deploy
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:integration
+      - run: pnpm build

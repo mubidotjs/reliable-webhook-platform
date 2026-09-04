@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: reliable_webhooks
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reliable_webhooks"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    ports:
+      - "${POSTGRES_PORT:-54329}:5432"
+    volumes:
+      - webhook-postgres-data:/var/lib/postgresql/data
+
+  receiver:
+    build:
+      context: .
+      dockerfile: infra/docker/receiver.Dockerfile
+    environment:
+      LOG_LEVEL: info
+      PORT: 4000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/health').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "4000:4000"
+
+volumes:
+  webhook-postgres-data:
