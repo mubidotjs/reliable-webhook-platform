@@ -1,0 +1,42 @@
+{
+  "name": "reliable-webhook-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A production-minded platform for durable, signed webhook delivery.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "dev": "pnpm --parallel --filter @rwp/web --filter @rwp/receiver dev",
+    "dev:web": "pnpm --filter @rwp/web dev",
+    "dev:receiver": "pnpm --filter @rwp/receiver dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "test:integration": "pnpm --filter @rwp/web test:integration",
+    "db:generate": "pnpm --filter @rwp/web db:generate",
+    "db:migrate": "pnpm --filter @rwp/web db:migrate",
+    "db:deploy": "pnpm --filter @rwp/web db:deploy",
+    "db:validate": "pnpm --filter @rwp/web db:validate",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^5.0.0"
+  }
+}

@@ -1,0 +1,327 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EndpointStatus {
+  ENABLED
+  DISABLED
+}
+
+enum ApiKeyScope {
+  READ
+  WRITE
+}
+
+enum DeliveryStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  RETRY_SCHEDULED
+  EXHAUSTED
+  CANCELLED
+}
+
+enum AttemptStatus {
+  STARTED
+  SUCCEEDED
+  FAILED
+  UNCERTAIN
+}
+
+enum OutboxStatus {
+  PENDING
+  PUBLISHING
+  PUBLISHED
+  CONSUMED
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  workspace     Workspace?
+  auditEvents   AuditEvent[] @relation("AuditActor")
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                     String    @id
+  accountId              String
+  providerId             String
+  userId                 String
+  accessToken            String?
+  refreshToken           String?
+  idToken                String?
+  accessTokenExpiresAt   DateTime?
+  refreshTokenExpiresAt  DateTime?
+  scope                   String?
+  password                String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verifications")
+}
+
+model Workspace {
+  id                 String            @id @default(cuid())
+  name               String
+  ownerId            String            @unique
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  owner              User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  apiKeys            ApiKey[]
+  endpoints          WebhookEndpoint[]
+  events             WebhookEvent[]
+  deliveries         Delivery[]
+  idempotencyRecords IdempotencyRecord[]
+  auditEvents        AuditEvent[]
+  quotaBuckets       QuotaBucket[]
+
+  @@map("workspaces")
+}
+
+model ApiKey {
+  id         String        @id @default(cuid())
+  workspaceId String
+  name       String
+  prefix     String        @unique
+  secretHash String        @unique
+  scopes     ApiKeyScope[]
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime      @default(now())
+  workspace  Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, revokedAt])
+  @@map("api_keys")
+}
+
+model WebhookEndpoint {
+  id                   String          @id @default(cuid())
+  workspaceId          String
+  url                  String
+  status               EndpointStatus  @default(ENABLED)
+  timeoutMs            Int             @default(5000)
+  currentSecretVersion Int             @default(1)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  workspace            Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  secrets              EndpointSecret[]
+  events               WebhookEvent[]
+  deliveries           Delivery[]
+
+  @@index([workspaceId, status, createdAt])
+  @@map("webhook_endpoints")
+}
+
+model EndpointSecret {
+  id                   String            @id @default(cuid())
+  endpointId           String
+  version              Int
+  encryptedSecret      String
+  encryptionKeyVersion String
+  createdAt            DateTime          @default(now())
+  retiredAt            DateTime?
+  endpoint             WebhookEndpoint   @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  deliveries           Delivery[]
+
+  @@unique([endpointId, version])
+  @@index([endpointId, retiredAt])
+  @@map("endpoint_secrets")
+}
+
+model WebhookEvent {
+  id            String            @id @default(cuid())
+  workspaceId   String
+  endpointId    String
+  type          String
+  payload       Json
+  deliveryBody  String
+  creationSource String
+  correlationId String
+  createdAt     DateTime          @default(now())
+  workspace     Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  endpoint      WebhookEndpoint   @relation(fields: [endpointId], references: [id], onDelete: Restrict)
+  deliveries    Delivery[]
+
+  @@index([workspaceId, createdAt, id])
+  @@index([endpointId, createdAt])
+  @@map("events")
+}
+
+model Delivery {
+  id               String           @id @default(cuid())
+  workspaceId      String
+  eventId          String
+  endpointId       String
+  endpointSecretId String
+  destinationUrl   String
+  timeoutMs        Int
+  status           DeliveryStatus   @default(PENDING)
+  nextAttemptAt    DateTime?
+  attemptCount     Int              @default(0)
+  leaseExpiresAt   DateTime?
+  replayOfId       String?
+  exhaustedReason  String?
+  correlationId    String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  event            WebhookEvent     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  endpoint         WebhookEndpoint  @relation(fields: [endpointId], references: [id], onDelete: Restrict)
+  endpointSecret   EndpointSecret   @relation(fields: [endpointSecretId], references: [id], onDelete: Restrict)
+  replayOf         Delivery?        @relation("DeliveryReplays", fields: [replayOfId], references: [id], onDelete: SetNull)
+  replays          Delivery[]       @relation("DeliveryReplays")
+  attempts         DeliveryAttempt[]
+
+  @@index([workspaceId, createdAt, id])
+  @@index([status, nextAttemptAt])
+  @@index([replayOfId])
+  @@map("deliveries")
+}
+
+model DeliveryAttempt {
+  id              String        @id @default(cuid())
+  deliveryId      String
+  sequence        Int
+  status          AttemptStatus @default(STARTED)
+  requestTimestamp DateTime
+  startedAt       DateTime      @default(now())
+  completedAt     DateTime?
+  httpStatus      Int?
+  durationMs      Int?
+  responseExcerpt String?
+  errorClass      String?
+  delivery        Delivery      @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@unique([deliveryId, sequence])
+  @@index([startedAt])
+  @@map("delivery_attempts")
+}
+
+model OutboxMessage {
+  id             String       @id @default(cuid())
+  topic          String
+  aggregateId    String
+  dedupeKey      String       @unique
+  payload        Json
+  status         OutboxStatus @default(PENDING)
+  availableAt    DateTime     @default(now())
+  leaseExpiresAt DateTime?
+  publishCount   Int          @default(0)
+  providerId     String?
+  publishedAt    DateTime?
+  consumedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([status, availableAt])
+  @@map("outbox_messages")
+}
+
+model IdempotencyRecord {
+  id          String    @id @default(cuid())
+  workspaceId String
+  operation   String
+  key         String
+  requestHash String
+  resourceId  String
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, operation, key])
+  @@index([expiresAt])
+  @@map("idempotency_records")
+}
+
+model QuotaBucket {
+  id          String    @id @default(cuid())
+  workspaceId String?
+  subject     String
+  bucketStart DateTime
+  count       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([subject, bucketStart, workspaceId])
+  @@index([bucketStart])
+  @@map("quota_buckets")
+}
+
+model AuditEvent {
+  id          String     @id @default(cuid())
+  workspaceId String
+  actorId     String?
+  action      String
+  targetType  String
+  targetId    String
+  metadata    Json
+  createdAt   DateTime   @default(now())
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor       User?      @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([targetType, targetId])
+  @@map("audit_events")
+}
+
+model MetricAggregate {
+  id          String   @id @default(cuid())
+  metric      String
+  bucketStart DateTime
+  dimensionKey String
+  dimensions  Json
+  count       BigInt   @default(0)
+  total       BigInt   @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([metric, bucketStart, dimensionKey])
+  @@index([bucketStart])
+  @@map("metric_aggregates")
+}
