@@ -31,9 +31,7 @@ export default defineConfig({
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID ?? "e2e-not-used",
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET ?? "e2e-not-used",
       ENCRYPTION_KEY_VERSION: "v1",
-      ENCRYPTION_KEY_V1:
-        process.env.ENCRYPTION_KEY_V1 ??
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      ENCRYPTION_KEY_V1: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     },
   },
 });
