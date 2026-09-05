@@ -8,10 +8,16 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "openapi:check": "tsx scripts/openapi.ts --check",
+    "openapi:generate": "tsx scripts/openapi.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "8.5.0",
     "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
   }
 }

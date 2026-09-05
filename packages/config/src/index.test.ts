@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseServerEnvironment } from "./index";
+import { parseEncryptionKeyring, parseServerEnvironment } from "./index";
 
 const validEnvironment = {
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/app",
@@ -26,5 +26,23 @@ describe("server environment", () => {
         BETTER_AUTH_SECRET: "too-short",
       }),
     ).toThrow();
+  });
+
+  it("parses a canonical versioned encryption keyring", () => {
+    const keyring = parseEncryptionKeyring({
+      ENCRYPTION_KEY_VERSION: "v1",
+      ENCRYPTION_KEY_V1: Buffer.alloc(32, 7).toString("base64url"),
+    });
+    expect(keyring.activeVersion).toBe("v1");
+    expect(keyring.keys.get("v1")).toEqual(Buffer.alloc(32, 7));
+  });
+
+  it("rejects incorrectly sized active encryption keys", () => {
+    expect(() =>
+      parseEncryptionKeyring({
+        ENCRYPTION_KEY_VERSION: "v1",
+        ENCRYPTION_KEY_V1: Buffer.alloc(31).toString("base64url"),
+      }),
+    ).toThrow(/32-byte/);
   });
 });

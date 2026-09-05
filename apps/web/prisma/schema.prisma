@@ -154,6 +154,7 @@ model WebhookEndpoint {
   deliveries           Delivery[]
 
   @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, createdAt, id])
   @@map("webhook_endpoints")
 }
 

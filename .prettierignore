@@ -1,0 +1,5 @@
+# User-supplied reference document; intentionally untracked and unchanged.
+docs/reliable-webhook-platform-spec.md
+
+# Generated from shared contracts; checked separately for drift.
+docs/openapi.json
