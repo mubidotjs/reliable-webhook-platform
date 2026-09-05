@@ -7,6 +7,7 @@ test-results/
 playwright/.auth/
 .turbo/
 .env
+.env.txt
 .env.local
 .env.*.local
 !.env.example
