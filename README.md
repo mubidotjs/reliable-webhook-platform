@@ -1,8 +1,8 @@
 # Reliable Webhook Platform
 
-A production-minded webhook delivery platform built as a TypeScript modular monolith. The repository is implemented milestone by milestone; M0 establishes the local runtime, authentication boundary, durable schema, and engineering guardrails.
+A production-minded webhook delivery platform built as a TypeScript modular monolith. The repository is implemented milestone by milestone; M1 adds secure, workspace-scoped endpoint configuration on top of the M0 foundation.
 
-## M0 status
+## M1 status
 
 - Next.js 16 App Router and React 19 web application
 - Better Auth database sessions with GitHub-only OAuth
@@ -12,8 +12,11 @@ A production-minded webhook delivery platform built as a TypeScript modular mono
 - Pure domain, contracts, configuration, and testing packages
 - Docker Compose, CI, strict TypeScript, ESLint, Prettier, and Vitest
 - Architecture decisions for the v1 reliability and security model
+- REST endpoint create, list, read, update, disable, and secret rotation
+- Show-once signing secrets encrypted with a versioned AES-256-GCM keyring
+- HTTPS/DNS/connection-time SSRF policy and generated OpenAPI 3.1 contracts
 
-Endpoint management begins in M1 after the M0 approval gate. Events, attempts, retries, outbox processing, and replay begin in M2.
+Endpoint management is implemented without delivery side effects. Events, attempts, retries, outbox processing, and replay begin in M2.
 
 ## Prerequisites
 
@@ -64,7 +67,9 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm test:integration
+pnpm openapi:check
 pnpm build
+pnpm test:e2e
 ```
 
 Integration tests require the local PostgreSQL service. Configuration is parsed through `@rwp/config`; secrets and provider credentials must remain in environment variables.
