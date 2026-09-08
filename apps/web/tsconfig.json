@@ -3,7 +3,11 @@
   "compilerOptions": {
     "incremental": true,
     "jsx": "preserve",
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "paths": {
       "@/*": ["./src/*"]
     }
@@ -15,7 +19,8 @@
     ".next/types/**/*.ts",
     "next.config.ts",
     "prisma.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "scripts/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }
