@@ -180,6 +180,8 @@ model WebhookEvent {
   endpointId    String
   type          String
   payload       Json
+  producerEventId String
+  requestHash String
   deliveryBody  String
   creationSource String
   correlationId String
@@ -189,6 +191,7 @@ model WebhookEvent {
   deliveries    Delivery[]
 
   @@index([workspaceId, createdAt, id])
+  @@unique([workspaceId, producerEventId], map: "events_workspace_producer_key")
   @@index([endpointId, createdAt])
   @@map("events")
 }
@@ -205,6 +208,11 @@ model Delivery {
   nextAttemptAt    DateTime?
   attemptCount     Int              @default(0)
   leaseExpiresAt   DateTime?
+  claimToken       String?
+  generation       Int @default(1)
+  retryDeadline    DateTime
+  terminalAt       DateTime?
+  lastError        String?
   replayOfId       String?
   exhaustedReason  String?
   correlationId    String
@@ -220,6 +228,8 @@ model Delivery {
 
   @@index([workspaceId, createdAt, id])
   @@index([status, nextAttemptAt])
+  @@unique([eventId, endpointId], map: "deliveries_event_endpoint_key")
+  @@index([status, leaseExpiresAt], map: "deliveries_processing_lease_idx")
   @@index([replayOfId])
   @@map("deliveries")
 }
@@ -236,11 +246,26 @@ model DeliveryAttempt {
   durationMs      Int?
   responseExcerpt String?
   errorClass      String?
+  destinationUrl String
+  outcome DeliveryAttemptOutcome?
   delivery        Delivery      @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
 
   @@unique([deliveryId, sequence])
   @@index([startedAt])
   @@map("delivery_attempts")
+}
+
+model DeliveryAttemptOutcome {
+  attemptId String @id
+  status AttemptStatus
+  completedAt DateTime
+  httpStatus Int?
+  durationMs Int?
+  errorClass String?
+  responseMetadata Json
+  resultingState DeliveryStatus
+  attempt DeliveryAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  @@map("delivery_attempt_outcomes")
 }
 
 model OutboxMessage {
@@ -252,6 +277,10 @@ model OutboxMessage {
   status         OutboxStatus @default(PENDING)
   availableAt    DateTime     @default(now())
   leaseExpiresAt DateTime?
+  claimToken     String?
+  generation     Int @default(1)
+  dueAt          DateTime @default(now())
+  lastError      String?
   publishCount   Int          @default(0)
   providerId     String?
   publishedAt    DateTime?
@@ -259,6 +288,8 @@ model OutboxMessage {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  @@index([status, leaseExpiresAt], map: "outbox_messages_lease_idx")
+  @@index([status, dueAt], map: "outbox_messages_due_idx")
   @@index([status, availableAt])
   @@map("outbox_messages")
 }

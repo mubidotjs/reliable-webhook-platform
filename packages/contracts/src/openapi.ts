@@ -1,3 +1,4 @@
+import { createEventSchema, acceptedEventSchema } from "./events";
 import {
   OpenApiGeneratorV31,
   OpenAPIRegistry,
@@ -151,13 +152,38 @@ export function createOpenApiDocument(): ReturnType<
     },
   });
 
+  registry.registerPath({
+    method: "post",
+    path: "/api/events",
+    summary: "Accept a durable webhook event",
+    security,
+    request: {
+      headers: z.object({ origin: z.string().url() }),
+      body: { content: { "application/json": { schema: createEventSchema } } },
+    },
+    responses: {
+      202: response(
+        acceptedEventSchema,
+        "Durably accepted, or an identical event already exists.",
+      ),
+      400: problem("Malformed JSON."),
+      401: problem("Authentication required."),
+      403: problem("Workspace or trusted origin required."),
+      404: problem("Endpoint not found."),
+      409: problem("Conflicting event ID or disabled endpoint."),
+      413: problem("Body exceeds 256 KiB."),
+      422: problem("Invalid input."),
+      429: problem("Daily acceptance quota reached."),
+    },
+  });
   const generator = new OpenApiGeneratorV31(registry.definitions);
   return generator.generateDocument({
     openapi: "3.1.0",
     info: {
       title: "Reliable Webhook Platform API",
-      version: "1.0.0-m1",
-      description: "Workspace-scoped webhook endpoint management.",
+      version: "1.0.0-m2",
+      description:
+        "Workspace-scoped endpoint management and durable event ingestion.",
     },
     servers: [{ url: "/", description: "Current origin" }],
   });

@@ -30,13 +30,14 @@ describe("endpoint contracts", () => {
     expect(() => updateEndpointSchema.parse({})).toThrow();
   });
 
-  it("generates the M1 paths from the shared schemas", () => {
+  it("generates the M1 and M2 paths from the shared schemas", () => {
     const document = createOpenApiDocument();
     expect(document.openapi).toBe("3.1.0");
     expect(Object.keys(document.paths ?? {})).toEqual([
       "/v1/endpoints",
       "/v1/endpoints/{id}",
       "/v1/endpoints/{id}/rotate-secret",
+      "/api/events",
     ]);
   });
 });
