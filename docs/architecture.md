@@ -34,7 +34,7 @@ Better Auth owns GitHub OAuth and database sessions. Every mutation rechecks the
 
 The foundation migration creates Better Auth records plus all planned v1 aggregates so later milestones can add behavior without destructive table churn. Foreign keys state deletion behavior explicitly. Compound indexes support cursor reads and worker claims. Partial unique indexes cover invariants that Prisma cannot express: a single primary delivery per event and one global quota bucket per subject and UTC bucket.
 
-## Reliability flow (M2 target)
+## Reliability flow (M2)
 
 ```mermaid
 sequenceDiagram
@@ -47,7 +47,8 @@ sequenceDiagram
   A->>S: validated command + authenticated workspace
   S->>D: transaction(event, delivery, quota, audit, outbox)
   D-->>S: commit
-  S->>Q: immediate publish attempt
+  S-->>A: accepted after commit
+  S->>Q: best-effort drain of persisted outbox work
   Q->>W: signed deduplicated callback
   W->>D: persist attempt + acquire lease
   W->>T: signed immutable envelope

@@ -65,3 +65,25 @@ export function parseEncryptionKeyring(
 
   return { activeVersion, keys };
 }
+
+const qstashEnvironmentSchema = z.object({
+  QUEUE_ADAPTER: z.literal("qstash"),
+  QSTASH_URL: z.string().url().default("https://qstash.upstash.io"),
+  QSTASH_TOKEN: z.string().min(1),
+  QSTASH_CURRENT_SIGNING_KEY: z.string().min(1),
+  QSTASH_NEXT_SIGNING_KEY: z.string().min(1),
+  APP_URL: z
+    .string()
+    .url()
+    .refine(
+      (value) => new URL(value).protocol === "https:",
+      "Hosted callbacks require HTTPS",
+    ),
+});
+export function parseQueueEnvironment(
+  source: Record<string, string | undefined>,
+) {
+  if ((source.QUEUE_ADAPTER ?? "local") === "local")
+    return { QUEUE_ADAPTER: "local" as const };
+  return qstashEnvironmentSchema.parse(source);
+}

@@ -1,8 +1,8 @@
 # Reliable Webhook Platform
 
-A production-minded webhook delivery platform built as a TypeScript modular monolith. The repository is implemented milestone by milestone; M1 adds secure, workspace-scoped endpoint configuration on top of the M0 foundation.
+A production-minded webhook delivery platform built as a TypeScript modular monolith. M1 provides secure endpoint configuration; M2 adds durable ingestion, signed delivery, retries, and crash recovery. Local verification is complete; live QStash milestone sign-off remains pending.
 
-## M1 status
+## Implementation status
 
 - Next.js 16 App Router and React 19 web application
 - Better Auth database sessions with GitHub-only OAuth
@@ -16,7 +16,11 @@ A production-minded webhook delivery platform built as a TypeScript modular mono
 - Show-once signing secrets encrypted with a versioned AES-256-GCM keyring
 - HTTPS/DNS/connection-time SSRF policy and generated OpenAPI 3.1 contracts
 
-Endpoint management is implemented without delivery side effects. Events, attempts, retries, outbox processing, and replay begin in M2.
+- Session-authenticated event ingestion with producer idempotency
+- Transactional PostgreSQL outbox, local worker, and signed QStash callbacks
+- Append-only attempt history, bounded retries, and crash recovery
+
+See [M2 verification](docs/reviews/m2-durable-delivery.md) for test results and remaining live-demo requirements. Replay and its management UI remain deferred.
 
 ## Prerequisites
 
@@ -122,3 +126,7 @@ Better Auth and its Prisma adapter are pinned together at 1.7.3. Versions 1.7.0â
 The production preflight inspects `public.accounts` for a manually added required `issuer` column. If found, it stops the release with a repair instruction. After confirming the live column and reviewing the database state, commit a migration containing `ALTER TABLE public.accounts ALTER COLUMN issuer DROP NOT NULL;` and apply it with the existing `pnpm db:deploy` command before retrying the production build. Preserve the column's data and the existing `(providerId, accountId)` unique constraint. No issuer migration is needed for the repository's current schema.
 
 The favicon reuses the Lucide webhook mark in `apps/web/src/app/icon.svg`; `favicon.ico` contains matching 16, 32, and 48 pixel images. Next.js supplies favicon metadata for every page automatically.
+
+## M2 durable delivery
+
+Session-authenticated event ingestion, PostgreSQL outbox dispatch, signed delivery, retries, and crash recovery are documented in [the M2 runbook](docs/m2-delivery.md). Run the local worker with `pnpm --filter @rwp/web worker`.

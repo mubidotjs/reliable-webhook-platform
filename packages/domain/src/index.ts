@@ -12,10 +12,10 @@ export type DeliveryStatus = (typeof deliveryStatuses)[number];
 const allowedTransitions: Readonly<
   Record<DeliveryStatus, readonly DeliveryStatus[]>
 > = {
-  PENDING: ["PROCESSING", "CANCELLED"],
+  PENDING: ["PROCESSING", "CANCELLED", "EXHAUSTED"],
   PROCESSING: ["SUCCEEDED", "RETRY_SCHEDULED", "EXHAUSTED"],
   SUCCEEDED: [],
-  RETRY_SCHEDULED: ["PROCESSING", "CANCELLED"],
+  RETRY_SCHEDULED: ["PROCESSING", "CANCELLED", "EXHAUSTED"],
   EXHAUSTED: [],
   CANCELLED: [],
 };
@@ -38,3 +38,5 @@ export function assertDeliveryTransition(
 
 export * from "./destination-policy";
 export * from "./signing";
+
+export * from "./retry-policy";

@@ -1,0 +1,46 @@
+{
+  "generatedAt": "2026-09-08T12:32:50.229Z",
+  "mode": "local subprocess harness; simulated queue outage",
+  "accepted": {
+    "eventId": "d9b112d1-9937-4d00-a0f3-13a5bcedb742",
+    "deliveryId": "cmtsnge8z00066sc5s4c14w9i",
+    "status": "PENDING"
+  },
+  "duplicateDeliveryId": "cmtsnge8z00066sc5s4c14w9i",
+  "status": "SUCCEEDED",
+  "receiverRequests": 2,
+  "freshWorkerProcesses": 3,
+  "publications": 3,
+  "history": [
+    {
+      "attemptId": "cmtsngi980000b8c53lykzso6",
+      "sequence": 1,
+      "startedAt": "2026-09-08T12:32:32.074Z",
+      "outcome": {
+        "attemptId": "cmtsngi980000b8c53lykzso6",
+        "status": "FAILED",
+        "completedAt": "2026-09-08T12:32:32.253Z",
+        "httpStatus": 500,
+        "durationMs": 102,
+        "errorClass": null,
+        "responseMetadata": {},
+        "resultingState": "RETRY_SCHEDULED"
+      }
+    },
+    {
+      "attemptId": "cmtsngv310000ykc5bklc42og",
+      "sequence": 2,
+      "startedAt": "2026-09-08T12:32:48.714Z",
+      "outcome": {
+        "attemptId": "cmtsngv310000ykc5bklc42og",
+        "status": "SUCCEEDED",
+        "completedAt": "2026-09-08T12:32:48.826Z",
+        "httpStatus": 200,
+        "durationMs": 61,
+        "errorClass": null,
+        "responseMetadata": {},
+        "resultingState": "SUCCEEDED"
+      }
+    }
+  ]
+}

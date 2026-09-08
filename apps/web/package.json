@@ -14,7 +14,10 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:validate": "prisma validate",
-    "vercel-build": "tsx scripts/vercel-build.ts"
+    "vercel-build": "tsx scripts/vercel-build.ts",
+    "worker": "tsx --tsconfig tsconfig.json scripts/delivery-worker.ts",
+    "queue:setup": "tsx --tsconfig tsconfig.json scripts/setup-recovery.ts",
+    "demo:m2": "tsx --tsconfig tsconfig.json scripts/m2-demo.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "1.7.3",
@@ -24,6 +27,7 @@
     "@rwp/config": "workspace:*",
     "@rwp/contracts": "workspace:*",
     "@rwp/domain": "workspace:*",
+    "@upstash/qstash": "^2.11.3",
     "better-auth": "1.7.3",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
