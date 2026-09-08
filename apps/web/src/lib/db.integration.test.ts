@@ -11,6 +11,27 @@ describe.runIf(runDatabaseTests)("PostgreSQL foundation", () => {
     await db.$disconnect();
   });
 
+  it("persists OAuth verification state", async () => {
+    const id = randomUUID();
+    try {
+      await db.verification.create({
+        data: {
+          id,
+          identifier: id,
+          value: "synthetic-oauth-state",
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+      await expect(
+        db.verification.findUnique({ where: { id } }),
+      ).resolves.toMatchObject({ value: "synthetic-oauth-state" });
+    } finally {
+      await db.verification.deleteMany({ where: { id } });
+    }
+    await expect(
+      db.verification.findUnique({ where: { id } }),
+    ).resolves.toBeNull();
+  });
   it("connects to PostgreSQL and executes a query", async () => {
     const result = await db.$queryRaw<Array<{ value: number }>>`
       SELECT 1::int AS value

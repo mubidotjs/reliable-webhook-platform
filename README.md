@@ -96,3 +96,21 @@ The public demo is intended for synthetic payloads only. Do not submit employer,
 ## License
 
 MIT
+
+## Vercel production deployment
+
+Set the Vercel project Root Directory to `apps/web`, enable access to source files outside that directory for the workspace packages, and use the committed `vercel.json` build command: `pnpm vercel-build`. Remove any dashboard Build Command override that bypasses this command. Install from the workspace lockfile with development dependencies available for Prisma and tsx.
+
+Configure production-scoped `DATABASE_URL` (pooled runtime connection) and `DIRECT_URL` (direct migration connection) for the **same database**, using the `public` schema. Configure `BETTER_AUTH_URL=https://webhooks.mubashirhussain.dev`, the auth secret and GitHub credentials, and register `https://webhooks.mubashirhussain.dev/api/auth/callback/github` in the GitHub OAuth app.
+
+The build generates Prisma Client first. Only when `VERCEL_ENV=production`, it checks database identity using a temporary transaction-scoped advisory lock, checks tables against completed migration history, applies committed migrations, and checks again before building Next.js. Different pooled/direct hostnames are supported. Both connections need access to PostgreSQL advisory locks; connection failure or any migration/preflight failure stops deployment. Migrations are additive but are not rolled back if the later application build fails.
+
+Preview and ordinary local builds never apply migrations automatically. Provision preview databases separately and do not give previews production database credentials. Do not promote a preview built without this production migration step directly to production; trigger a production build.
+
+### Missing auth tables / P2021
+
+If GitHub sign-in reports that `public.verifications` does not exist, inspect the production database URLs and migration status with `pnpm --filter @rwp/web exec prisma migrate status` using production-scoped `DIRECT_URL`. Deploy using the production build above to apply the existing foundation migration. Prisma CLI reads `DIRECT_URL`; the running app reads `DATABASE_URL`. Never paste credentials into logs or issue reports.
+
+If completed migration history references missing tables, the build reports schema drift and stops. Recover from the appropriate backup or prepare a reviewed, targeted repair based on the actual database state. Do not run `migrate reset`, edit applied migration files, or mark missing migrations as applied. An SSL-mode warning is separate from a missing-table error.
+
+After release, click Continue with GitHub and confirm the social endpoint no longer returns 500. Complete OAuth and verify the session and dashboard/onboarding flow. A local test cannot validate production GitHub credentials or the live callback configuration.

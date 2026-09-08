@@ -13,7 +13,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:validate": "prisma validate"
+    "db:validate": "prisma validate",
+    "vercel-build": "tsx scripts/vercel-build.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.2",
