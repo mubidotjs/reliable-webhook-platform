@@ -34,6 +34,17 @@ export async function checkDatabase(env: NodeJS.ProcessEnv): Promise<void> {
       throw new Error(
         "DATABASE_URL and DIRECT_URL do not reach the same database.",
       );
+    const issuerColumn = await direct.query(
+      "SELECT is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'accounts' AND column_name = 'issuer'",
+    );
+    if (
+      issuerColumn.rows.some(
+        (column: { is_nullable: string }) => column.is_nullable === "NO",
+      )
+    )
+      throw new Error(
+        "Legacy accounts.issuer is required, but Better Auth 1.7.3 does not write it. Apply a reviewed migration to DROP NOT NULL on this column before deploying; preserve existing account data.",
+      );
     const historyExists = await direct.query(
       "SELECT to_regclass('public._prisma_migrations') AS relation",
     );

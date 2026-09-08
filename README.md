@@ -114,3 +114,11 @@ If GitHub sign-in reports that `public.verifications` does not exist, inspect th
 If completed migration history references missing tables, the build reports schema drift and stops. Recover from the appropriate backup or prepare a reviewed, targeted repair based on the actual database state. Do not run `migrate reset`, edit applied migration files, or mark missing migrations as applied. An SSL-mode warning is separate from a missing-table error.
 
 After release, click Continue with GitHub and confirm the social endpoint no longer returns 500. Complete OAuth and verify the session and dashboard/onboarding flow. A local test cannot validate production GitHub credentials or the live callback configuration.
+
+### Better Auth callback compatibility
+
+Better Auth and its Prisma adapter are pinned together at 1.7.3. Versions 1.7.0–1.7.2 queried an account `issuer` field; 1.7.3 uses the existing `(providerId, accountId)` key again. Keep the committed schema and regenerate Prisma Client during deployment. See the [official upgrade guide](https://better-auth.com/docs/guides/1-7-upgrade-guide).
+
+The production preflight inspects `public.accounts` for a manually added required `issuer` column. If found, it stops the release with a repair instruction. After confirming the live column and reviewing the database state, commit a migration containing `ALTER TABLE public.accounts ALTER COLUMN issuer DROP NOT NULL;` and apply it with the existing `pnpm db:deploy` command before retrying the production build. Preserve the column's data and the existing `(providerId, accountId)` unique constraint. No issuer migration is needed for the repository's current schema.
+
+The favicon reuses the Lucide webhook mark in `apps/web/src/app/icon.svg`; `favicon.ico` contains matching 16, 32, and 48 pixel images. Next.js supplies favicon metadata for every page automatically.
