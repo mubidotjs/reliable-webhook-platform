@@ -24,6 +24,12 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       ...process.env,
+      QUEUE_ADAPTER: "qstash",
+      QSTASH_URL: "http://127.0.0.1:9",
+      QSTASH_TOKEN: "e2e-unused",
+      QSTASH_CURRENT_SIGNING_KEY: "e2e-unused",
+      QSTASH_NEXT_SIGNING_KEY: "e2e-unused",
+      APP_URL: "https://example.test",
       DATABASE_URL: databaseURL,
       DIRECT_URL: process.env.DIRECT_URL ?? databaseURL,
       BETTER_AUTH_SECRET: authSecret,

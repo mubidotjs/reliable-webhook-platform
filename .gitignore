@@ -19,3 +19,6 @@ apps/web/src/generated/prisma/
 next-env.d.ts
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
+
+# Local verified receiver receipts
+apps/receiver/*.sqlite*
