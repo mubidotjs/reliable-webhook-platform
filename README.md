@@ -130,3 +130,7 @@ The favicon reuses the Lucide webhook mark in `apps/web/src/app/icon.svg`; `favi
 ## M2 durable delivery
 
 Session-authenticated event ingestion, PostgreSQL outbox dispatch, signed delivery, retries, and crash recovery are documented in [the M2 runbook](docs/m2-delivery.md). Run the local worker with `pnpm --filter @rwp/web worker`.
+
+## Using the signed-in workspace
+
+The workspace has Overview, Endpoints, Events, Deliveries, and Setup guide navigation. Follow [Add and verify your webhook](docs/webhook-workspace.md) to register a receiver, save its secret, send an event, and verify its signature.

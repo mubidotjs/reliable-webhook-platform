@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getCurrentSession } from "@/lib/session";
 import {
   Activity,
   ArrowUpRight,
@@ -39,7 +41,8 @@ const recentDeliveries = [
   },
 ];
 
-export default function HomePage(): React.ReactNode {
+export default async function HomePage(): Promise<React.ReactNode> {
+  if (await getCurrentSession()) redirect("/dashboard");
   return (
     <main className="min-h-screen px-4 py-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1480px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/80 shadow-panel backdrop-blur">
@@ -74,13 +77,14 @@ export default function HomePage(): React.ReactNode {
             <nav aria-label="Primary" className="space-y-1">
               {(
                 [
-                  ["Overview", Activity],
-                  ["Endpoints", RadioTower],
-                  ["Events", Webhook],
-                  ["Deliveries", RotateCcw],
+                  ["Overview", Activity, "/dashboard"],
+                  ["Endpoints", RadioTower, "/dashboard/endpoints"],
+                  ["Events", Webhook, "/dashboard/events"],
+                  ["Deliveries", RotateCcw, "/dashboard/deliveries"],
                 ] as const
-              ).map(([label, Icon], index) => (
-                <span
+              ).map(([label, Icon, href], index) => (
+                <Link
+                  href={href}
                   key={label}
                   className={
                     index === 0
@@ -90,7 +94,7 @@ export default function HomePage(): React.ReactNode {
                 >
                   <Icon aria-hidden="true" className="size-4" />
                   {label}
-                </span>
+                </Link>
               ))}
             </nav>
             <div className="mt-10 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
@@ -113,7 +117,7 @@ export default function HomePage(): React.ReactNode {
               <div>
                 <div className="mb-3 flex items-center gap-2 text-sm font-medium text-cyan-300">
                   <span className="size-2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.9)]" />
-                  Local foundation ready
+                  Explore the workspace
                 </div>
                 <h1 className="max-w-3xl text-3xl font-semibold tracking-[-0.035em] text-white sm:text-4xl">
                   Delivery failures should be explainable—and recoverable.
@@ -131,9 +135,9 @@ export default function HomePage(): React.ReactNode {
             <div className="grid gap-4 sm:grid-cols-3">
               {(
                 [
-                  ["Delivery success", "98.7%", "Last 24 hours", Check],
-                  ["Median latency", "182 ms", "Across all attempts", Clock3],
-                  ["Outbox backlog", "0", "No delayed messages", RadioTower],
+                  ["Delivery success", "98.7%", "Illustrative sample", Check],
+                  ["Median latency", "182 ms", "Illustrative sample", Clock3],
+                  ["Outbox backlog", "0", "Illustrative sample", RadioTower],
                 ] as const
               ).map(([label, value, detail, Icon]) => (
                 <article

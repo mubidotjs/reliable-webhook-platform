@@ -49,12 +49,30 @@ export default async function globalSetup() {
   });
   const primary = await createAuthenticatedOwner(database, "M1 Primary");
   const outsider = await createAuthenticatedOwner(database, "M1 Outsider");
+  const ui = await createAuthenticatedOwner(database, "Workspace UI");
+  process.env.E2E_UI_COOKIE = ui.cookieHeader;
   process.env.E2E_PRIMARY_COOKIE = primary.cookieHeader;
   process.env.E2E_OUTSIDER_COOKIE = outsider.cookieHeader;
 
   return async () => {
+    const workspaces = await database.workspace.findMany({
+      where: { ownerId: { in: [primary.userId, outsider.userId, ui.userId] } },
+    });
+    const workspaceIds = workspaces.map((w) => w.id);
+    const deliveries = await database.delivery.findMany({
+      where: { workspaceId: { in: workspaceIds } },
+    });
+    await database.outboxMessage.deleteMany({
+      where: { aggregateId: { in: deliveries.map((d) => d.id) } },
+    });
+    await database.delivery.deleteMany({
+      where: { workspaceId: { in: workspaceIds } },
+    });
+    await database.webhookEvent.deleteMany({
+      where: { workspaceId: { in: workspaceIds } },
+    });
     await database.user.deleteMany({
-      where: { id: { in: [primary.userId, outsider.userId] } },
+      where: { id: { in: [primary.userId, outsider.userId, ui.userId] } },
     });
     await database.$disconnect();
   };
