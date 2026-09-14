@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { errorDiagnostic } from "./error-diagnostic";
 
 import { auth } from "@/lib/auth";
 import { ApiError, problemResponse } from "@/lib/api-errors";
@@ -96,6 +97,13 @@ export async function handleApiRequest(
     if (error instanceof ApiError) {
       return problemResponse(error, correlationId);
     }
+    console.error(
+      JSON.stringify({
+        event: "api_failure",
+        correlationId,
+        ...errorDiagnostic(error),
+      }),
+    );
     return problemResponse(
       new ApiError(
         500,
