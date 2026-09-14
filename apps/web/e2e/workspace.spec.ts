@@ -64,6 +64,7 @@ test.describe.serial("signed-in workspace", () => {
     await page.getByRole("button", { name: "I saved the secret" }).click();
     await expect(page.getByText(secret, { exact: true })).toHaveCount(0);
     await page.getByRole("link", { name: "Open endpoint" }).click();
+    await expect(page).toHaveURL(/\/dashboard\/endpoints\/[^/]+$/);
     endpointId = page.url().split("/").at(-1)!;
     await page.reload();
     await expect(page.getByText(secret, { exact: true })).toHaveCount(0);
