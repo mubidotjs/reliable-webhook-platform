@@ -1,3 +1,7 @@
+import {
+  deliverySelect,
+  createDeliveryQueries,
+} from "@/modules/deliveries/queries";
 import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
@@ -42,6 +46,7 @@ function page<T extends { id: string; createdAt: Date }>(rows: T[]) {
   };
 }
 const endpointSelect = {
+  name: true,
   id: true,
   url: true,
   status: true,
@@ -56,19 +61,6 @@ const eventSelect = {
   endpointId: true,
   endpoint: { select: { url: true } },
   deliveries: { select: { id: true, status: true } },
-} as const;
-const deliverySelect = {
-  id: true,
-  eventId: true,
-  endpointId: true,
-  destinationUrl: true,
-  status: true,
-  attemptCount: true,
-  createdAt: true,
-  nextAttemptAt: true,
-  terminalAt: true,
-  lastError: true,
-  event: { select: { producerEventId: true, type: true } },
 } as const;
 const orderBy = [{ createdAt: "desc" }, { id: "desc" }] as const;
 export function createDashboardQueries(database: PrismaClient = db) {
@@ -128,42 +120,13 @@ export function createDashboardQueries(database: PrismaClient = db) {
       });
     },
     async deliveries(workspaceId: string, cursor?: string) {
-      return page(
-        await database.delivery.findMany({
-          where: { workspaceId, ...cursorWhere(cursor) },
-          select: deliverySelect,
-          orderBy: [...orderBy],
-          take: 26,
-        }),
-      );
+      const result = await createDeliveryQueries(database).list(workspaceId, {
+        cursor,
+      });
+      return { data: result.data, nextCursor: result.page.nextCursor };
     },
     delivery(workspaceId: string, id: string) {
-      return database.delivery.findFirst({
-        where: { workspaceId, id },
-        select: {
-          ...deliverySelect,
-          retryDeadline: true,
-          attempts: {
-            orderBy: { sequence: "asc" },
-            select: {
-              id: true,
-              sequence: true,
-              startedAt: true,
-              destinationUrl: true,
-              outcome: {
-                select: {
-                  status: true,
-                  completedAt: true,
-                  httpStatus: true,
-                  durationMs: true,
-                  errorClass: true,
-                  resultingState: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      return createDeliveryQueries(database).detail(workspaceId, id);
     },
   };
 }

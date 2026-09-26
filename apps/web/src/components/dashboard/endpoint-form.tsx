@@ -5,9 +5,15 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { inputStyle, panel } from "./common";
 import { workspaceRequest, WorkspaceApiError } from "./api";
-type Endpoint = { id: string; url: string; status: string };
+type Endpoint = {
+  name?: string | null;
+  id: string;
+  url: string;
+  status: string;
+};
 export function EndpointForm({ endpoint }: { endpoint?: Endpoint }) {
   const router = useRouter();
+  const [name, setName] = useState(endpoint?.name ?? "");
   const [url, setUrl] = useState(endpoint?.url ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +51,7 @@ export function EndpointForm({ endpoint }: { endpoint?: Endpoint }) {
           ? undefined
           : action === "disable"
             ? { status: "DISABLED" }
-            : { url },
+            : { url, name },
       )) as {
         signingSecret?: string;
         data: { id?: string; signingSecret?: string };
@@ -62,7 +68,7 @@ export function EndpointForm({ endpoint }: { endpoint?: Endpoint }) {
           : action === "disable"
             ? "Endpoint disabled."
             : endpoint
-              ? "Endpoint URL updated."
+              ? "Endpoint settings updated."
               : "Endpoint created. Save its secret before continuing.",
       );
       router.refresh();
@@ -96,6 +102,16 @@ export function EndpointForm({ endpoint }: { endpoint?: Endpoint }) {
         }}
       >
         <label className="block text-sm text-slate-300">
+          Endpoint name (optional)
+          <input
+            className={inputStyle}
+            maxLength={100}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={busy || disabled || Boolean(createdId)}
+          />
+        </label>
+        <label className="block text-sm text-slate-300">
           Receiver URL
           <input
             type="url"
@@ -114,7 +130,11 @@ export function EndpointForm({ endpoint }: { endpoint?: Endpoint }) {
         </p>
         {!disabled && !createdId && (
           <Button disabled={busy}>
-            {busy ? "Saving..." : endpoint ? "Save URL" : "Create endpoint"}
+            {busy
+              ? "Saving..."
+              : endpoint
+                ? "Save endpoint"
+                : "Create endpoint"}
           </Button>
         )}
       </form>

@@ -17,7 +17,8 @@
     "vercel-build": "tsx scripts/vercel-build.ts",
     "worker": "tsx --tsconfig tsconfig.json scripts/delivery-worker.ts",
     "queue:setup": "tsx --tsconfig tsconfig.json scripts/setup-recovery.ts",
-    "demo:m2": "tsx --tsconfig tsconfig.json scripts/m2-demo.ts"
+    "demo:m2": "tsx --tsconfig tsconfig.json scripts/m2-demo.ts",
+    "demo:m3": "tsx --tsconfig tsconfig.json scripts/m3-demo.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "1.7.3",

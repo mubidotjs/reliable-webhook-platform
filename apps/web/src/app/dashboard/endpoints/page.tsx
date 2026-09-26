@@ -1,3 +1,4 @@
+import { endpointLabel } from "@/components/dashboard/delivery-format";
 import { requireDashboardWorkspace } from "@/modules/dashboard/session";
 import { dashboardQueries } from "@/modules/dashboard/queries";
 import {
@@ -38,8 +39,9 @@ export default async function EndpointsPage({
             >
               <div className="min-w-0">
                 <RecordLink href={`/dashboard/endpoints/${e.id}`}>
-                  {e.url}
+                  {endpointLabel(e)}
                 </RecordLink>
+                <p className="mt-1 break-all text-xs text-slate-400">{e.url}</p>
                 <p className="mt-2 text-xs text-slate-500">
                   <Time value={e.createdAt} /> · Secret version{" "}
                   {e.currentSecretVersion}

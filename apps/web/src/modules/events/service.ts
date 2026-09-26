@@ -1,3 +1,4 @@
+import { consumeAcceptanceQuota } from "@/modules/deliveries/quotas";
 import { createHash, randomUUID } from "node:crypto";
 import type { CreateEventInput } from "@rwp/contracts";
 import { RETRY_WINDOW_MS } from "@rwp/domain";
@@ -50,7 +51,7 @@ export function createEventService(
                     producerEventId,
                   },
                 },
-                include: { deliveries: true },
+                include: { deliveries: { where: { replayOfId: null } } },
               });
               if (existing) {
                 if (existing.requestHash !== requestHash)
@@ -94,41 +95,7 @@ export function createEventService(
               );
               if (!secret) throw new Error("Endpoint secret missing");
               const acceptedAt = now();
-              const bucketStart = new Date(acceptedAt);
-              bucketStart.setUTCHours(0, 0, 0, 0);
-              for (const [workspaceId, limit] of [
-                [null, 100],
-                [actor.workspaceId, 25],
-              ] as const) {
-                const bucket = await tx.quotaBucket.findFirst({
-                  where: {
-                    workspaceId,
-                    subject: "accepted-deliveries",
-                    bucketStart,
-                  },
-                });
-                if ((bucket?.count ?? 0) >= limit)
-                  throw new ApiError(
-                    429,
-                    "DAILY_QUOTA_EXCEEDED",
-                    "Daily quota exceeded",
-                    "Try again after the next UTC day.",
-                  );
-                if (bucket)
-                  await tx.quotaBucket.update({
-                    where: { id: bucket.id },
-                    data: { count: { increment: 1 } },
-                  });
-                else
-                  await tx.quotaBucket.create({
-                    data: {
-                      workspaceId,
-                      subject: "accepted-deliveries",
-                      bucketStart,
-                      count: 1,
-                    },
-                  });
-              }
+              await consumeAcceptanceQuota(tx, actor.workspaceId, acceptedAt);
               const event = await tx.webhookEvent.create({
                 data: {
                   workspaceId: actor.workspaceId,
@@ -157,6 +124,7 @@ export function createEventService(
                   endpointSecretId: secret.id,
                   destinationUrl: endpoint.url,
                   timeoutMs: 5000,
+                  createdAt: acceptedAt,
                   nextAttemptAt: acceptedAt,
                   retryDeadline: new Date(
                     acceptedAt.getTime() + RETRY_WINDOW_MS,

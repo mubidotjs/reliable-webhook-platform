@@ -134,3 +134,7 @@ Session-authenticated event ingestion, PostgreSQL outbox dispatch, signed delive
 ## Using the signed-in workspace
 
 The workspace has Overview, Endpoints, Events, Deliveries, and Setup guide navigation. Follow [Add and verify your webhook](docs/webhook-workspace.md) to register a receiver, save its secret, send an event, and verify its signature.
+
+## M3 operations
+
+Inspect delivery history, attempts, retry schedules, and confirmed replays in the dashboard. See [M3 — Operations UI](docs/m3-operations.md) for routes, replay semantics, local demonstrations, and verification.

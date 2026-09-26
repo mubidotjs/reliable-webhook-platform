@@ -242,7 +242,7 @@ Use a controlled receiver capable of returning delayed responses, 429s, selected
 
 ## 12. Milestones and review gates
 
-| Milestone            | Codex output                                                          | Approval evidence                                         |
+| Milestone            | Implementation output                                                 | Approval evidence                                         |
 | -------------------- | --------------------------------------------------------------------- | --------------------------------------------------------- |
 | M0 Foundation        | Workspace, app, domain packages, database, CI and local stack         | Clean build/test run and architecture walkthrough         |
 | M1 Secure endpoints  | Endpoint lifecycle, secret/signing and validation                     | Security checklist and working signed request             |
@@ -271,4 +271,4 @@ Recommended defaults are shown first.
 3. **Deployment:** approved — strict `$0/month` Vercel Hobby + Neon Free + Upstash QStash Free profile, with hard application quotas and no paid-plan attachment.
 4. **Product naming:** keep the descriptive repository name for recruiter clarity, or add a separate brand name later.
 
-Once these defaults are approved, Codex can produce the exact repository settings and begin M0 immediately after the repository is created.
+Once these defaults are approved, configure the repository settings and begin M0 after the repository is created.

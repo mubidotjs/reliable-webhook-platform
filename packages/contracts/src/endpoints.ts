@@ -5,8 +5,11 @@ export const endpointStatusSchema = z.enum(["ENABLED", "DISABLED"]);
 export const endpointTimeoutSchema = z.number().int().min(1_000).max(15_000);
 export const endpointUrlSchema = z.string().trim().min(1).max(2_048);
 
+export const endpointNameSchema = z.string().trim().max(100).nullable();
+
 export const endpointSchema = z.object({
   id: endpointIdSchema,
+  name: endpointNameSchema,
   url: z.string().url(),
   status: endpointStatusSchema,
   timeoutMs: endpointTimeoutSchema,
@@ -17,6 +20,7 @@ export const endpointSchema = z.object({
 
 export const createEndpointSchema = z
   .object({
+    name: endpointNameSchema.optional(),
     url: endpointUrlSchema,
     timeoutMs: endpointTimeoutSchema.default(5_000),
   })
@@ -24,13 +28,20 @@ export const createEndpointSchema = z
 
 const editEndpointSchema = z
   .object({
+    name: endpointNameSchema.optional(),
     url: endpointUrlSchema.optional(),
     timeoutMs: endpointTimeoutSchema.optional(),
   })
   .strict()
-  .refine((value) => value.url !== undefined || value.timeoutMs !== undefined, {
-    message: "At least one endpoint field must be provided.",
-  });
+  .refine(
+    (value) =>
+      value.name !== undefined ||
+      value.url !== undefined ||
+      value.timeoutMs !== undefined,
+    {
+      message: "At least one endpoint field must be provided.",
+    },
+  );
 
 const disableEndpointSchema = z
   .object({ status: z.literal("DISABLED") })
