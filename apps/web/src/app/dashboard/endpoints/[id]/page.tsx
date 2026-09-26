@@ -33,6 +33,7 @@ export default async function EndpointPage({
       <EndpointForm
         endpoint={{
           id: endpoint.id,
+          name: endpoint.name,
           url: endpoint.url,
           status: endpoint.status,
         }}

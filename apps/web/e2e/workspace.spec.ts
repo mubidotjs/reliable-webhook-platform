@@ -71,7 +71,7 @@ test.describe.serial("signed-in workspace", () => {
     await page
       .getByLabel("Receiver URL")
       .fill("https://example.com/workspace-updated");
-    await page.getByRole("button", { name: "Save URL" }).click();
+    await page.getByRole("button", { name: "Save endpoint" }).click();
     await expect(page.getByRole("status")).toContainText("updated");
   });
   test("preserves the event ID and payload after an uncertain submission", async ({
@@ -105,7 +105,7 @@ test.describe.serial("signed-in workspace", () => {
     await expect(
       page.getByRole("heading", { name: "Delivery details" }),
     ).toBeVisible();
-    await expect(page.getByText("PENDING", { exact: true })).toBeVisible();
+    await expect(page.getByText("Pending", { exact: true })).toBeVisible();
   });
   test("refreshes retry and success history and stops polling at terminal state", async ({
     page,
@@ -140,7 +140,9 @@ test.describe.serial("signed-in workspace", () => {
       },
     });
     await page.goto(`/dashboard/deliveries/${deliveryId}`);
-    await expect(page.getByText("500", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("listitem").getByText("500", { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText("Updates every 3 seconds")).toBeVisible();
     await database.deliveryAttempt.create({
       data: {
@@ -172,7 +174,9 @@ test.describe.serial("signed-in workspace", () => {
     await expect(
       page.getByText("HTTP delivery succeeded.", { exact: false }),
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText("200", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("listitem").getByText("200", { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText("Updates every 3 seconds")).toHaveCount(0);
     await page.screenshot({
       path: "test-results/workspace-delivery.png",
@@ -215,7 +219,7 @@ test.describe.serial("signed-in workspace", () => {
       page.getByText("The worker stopped before saving"),
     ).toBeVisible();
     await expect(
-      page.getByText("RETRY_WINDOW_EXPIRED", { exact: true }),
+      page.getByText("The retry window expired", { exact: true }),
     ).toBeVisible();
   });
   test("protects foreign records and handles secret rotation and disablement", async ({

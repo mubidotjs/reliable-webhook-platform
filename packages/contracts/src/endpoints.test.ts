@@ -30,7 +30,7 @@ describe("endpoint contracts", () => {
     expect(() => updateEndpointSchema.parse({})).toThrow();
   });
 
-  it("generates the M1 and M2 paths from the shared schemas", () => {
+  it("generates the M1 through M3 paths from the shared schemas", () => {
     const document = createOpenApiDocument();
     expect(document.openapi).toBe("3.1.0");
     expect(Object.keys(document.paths ?? {})).toEqual([
@@ -38,6 +38,9 @@ describe("endpoint contracts", () => {
       "/v1/endpoints/{id}",
       "/v1/endpoints/{id}/rotate-secret",
       "/api/events",
+      "/api/deliveries",
+      "/api/deliveries/{id}",
+      "/api/deliveries/{id}/replay",
     ]);
   });
 });

@@ -1,3 +1,4 @@
+import { deliveryLabels } from "./delivery-format";
 import Link from "next/link";
 export const panel =
   "rounded-xl border border-slate-800 bg-slate-900/50 p-5 sm:p-6";
@@ -29,7 +30,7 @@ export function StatusBadge({ status }: { status: string }) {
       : "status-warning";
   return (
     <span className={`status-badge ${tone}`}>
-      {status.replaceAll("_", " ")}
+      {deliveryLabels[status] ?? status.replaceAll("_", " ")}
     </span>
   );
 }

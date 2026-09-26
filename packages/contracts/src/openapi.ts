@@ -1,3 +1,11 @@
+import {
+  deliveryQuerySchema,
+  deliveryListResponseSchema,
+  deliveryDetailResponseSchema,
+  replayRequestSchema,
+  replayResponseSchema,
+  replayKeySchema,
+} from "./deliveries";
 import { createEventSchema, acceptedEventSchema } from "./events";
 import {
   OpenApiGeneratorV31,
@@ -176,12 +184,73 @@ export function createOpenApiDocument(): ReturnType<
       429: problem("Daily acceptance quota reached."),
     },
   });
+  registry.registerPath({
+    method: "get",
+    path: "/api/deliveries",
+    summary: "List workspace delivery history",
+    security,
+    request: { query: deliveryQuerySchema },
+    responses: {
+      200: response(deliveryListResponseSchema, "A lightweight delivery page."),
+      400: problem("Invalid filters or cursor."),
+      401: problem("Authentication required."),
+      403: problem("Workspace required."),
+    },
+  });
+  registry.registerPath({
+    method: "get",
+    path: "/api/deliveries/{id}",
+    summary: "Inspect a delivery and its attempts",
+    security,
+    request: { params: idParams },
+    responses: {
+      200: response(
+        deliveryDetailResponseSchema,
+        "Delivery, event, endpoint, attempts and replay eligibility.",
+      ),
+      401: problem("Authentication required."),
+      403: problem("Workspace required."),
+      404: problem("Delivery not found in this workspace."),
+    },
+  });
+  registry.registerPath({
+    method: "post",
+    path: "/api/deliveries/{id}/replay",
+    summary: "Replay a terminal delivery using current endpoint configuration",
+    security,
+    request: {
+      params: idParams,
+      headers: z.object({
+        origin: z.string().url(),
+        "idempotency-key": replayKeySchema,
+      }),
+      body: {
+        content: { "application/json": { schema: replayRequestSchema } },
+      },
+    },
+    responses: {
+      202: response(
+        replayResponseSchema,
+        "Durably queued, or the existing result for this key within 24 hours.",
+      ),
+      400: problem("Malformed body."),
+      401: problem("Authentication required."),
+      403: problem("Workspace or trusted origin required."),
+      404: problem("Delivery not found."),
+      409: problem(
+        "Active delivery, disabled or changed endpoint, or conflicting idempotency key.",
+      ),
+      413: problem("Request exceeds size limit."),
+      422: problem("Invalid input or missing idempotency key."),
+      429: problem("Daily acceptance quota reached."),
+    },
+  });
   const generator = new OpenApiGeneratorV31(registry.definitions);
   return generator.generateDocument({
     openapi: "3.1.0",
     info: {
       title: "Reliable Webhook Platform API",
-      version: "1.0.0-m2",
+      version: "1.0.0-m3",
       description:
         "Workspace-scoped endpoint management and durable event ingestion.",
     },

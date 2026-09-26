@@ -140,6 +140,7 @@ model ApiKey {
 }
 
 model WebhookEndpoint {
+  name String?
   id                   String          @id @default(cuid())
   workspaceId          String
   url                  String
@@ -228,7 +229,9 @@ model Delivery {
 
   @@index([workspaceId, createdAt, id])
   @@index([status, nextAttemptAt])
-  @@unique([eventId, endpointId], map: "deliveries_event_endpoint_key")
+  @@index([eventId, endpointId])
+  @@index([workspaceId, status, createdAt, id])
+  @@index([workspaceId, endpointId, createdAt, id])
   @@index([status, leaseExpiresAt], map: "deliveries_processing_lease_idx")
   @@index([replayOfId])
   @@map("deliveries")

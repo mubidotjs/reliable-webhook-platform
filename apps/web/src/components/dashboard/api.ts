@@ -2,6 +2,7 @@ export class WorkspaceApiError extends Error {
   constructor(
     message: string,
     public readonly uncertain = false,
+    public readonly code?: string,
   ) {
     super(message);
   }
@@ -10,13 +11,14 @@ export async function workspaceRequest(
   path: string,
   method: string,
   body?: unknown,
+  headers: Record<string, string> = {},
 ): Promise<unknown> {
   let response: Response;
   try {
     response = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...headers },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(20_000),
     });
@@ -40,10 +42,11 @@ export async function workspaceRequest(
     );
   }
   if (!response.ok) {
-    const problem = result as { detail?: string };
+    const problem = result as { detail?: string; code?: string };
     throw new WorkspaceApiError(
       problem.detail ?? "The request could not be completed.",
       response.status >= 500,
+      problem.code,
     );
   }
   return result;

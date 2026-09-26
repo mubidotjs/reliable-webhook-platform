@@ -29,6 +29,7 @@ type ActorContext = {
 };
 
 type EndpointRow = {
+  name: string | null;
   id: string;
   url: string;
   status: "ENABLED" | "DISABLED";
@@ -43,6 +44,7 @@ type CursorPayload = { v: 1; createdAt: string; id: string };
 function endpointResource(endpoint: EndpointRow): EndpointResource {
   return {
     id: endpoint.id,
+    name: endpoint.name,
     url: endpoint.url,
     status: endpoint.status,
     timeoutMs: endpoint.timeoutMs,
@@ -169,6 +171,7 @@ export class EndpointService {
         data: {
           workspaceId: actor.workspaceId,
           url,
+          name: input.name?.trim() || null,
           timeoutMs: input.timeoutMs,
         },
       });
@@ -289,6 +292,7 @@ export class EndpointService {
       const changedFields = disabling
         ? ["status"]
         : [
+            ...(input.name !== undefined ? ["name"] : []),
             ...(normalizedUrl ? ["url"] : []),
             ...(input.timeoutMs !== undefined ? ["timeoutMs"] : []),
           ];
@@ -297,6 +301,9 @@ export class EndpointService {
         data: disabling
           ? { status: "DISABLED" }
           : {
+              ...(input.name !== undefined
+                ? { name: input.name?.trim() || null }
+                : {}),
               ...(normalizedUrl ? { url: normalizedUrl } : {}),
               ...(input.timeoutMs !== undefined
                 ? { timeoutMs: input.timeoutMs }
