@@ -62,3 +62,20 @@ jobs:
       - run: pnpm openapi:check
       - run: pnpm build
       - run: pnpm test:e2e
+      - name: Prepare isolated load database
+        env:
+          PGPASSWORD: postgres
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reliable_webhooks_m4?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/reliable_webhooks_m4?schema=public
+        run: |
+          docker exec "${{ job.services.postgres.id }}" createdb --username=postgres reliable_webhooks_m4
+          pnpm db:deploy
+      - name: Delivery load smoke test
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reliable_webhooks_m4?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/reliable_webhooks_m4?schema=public
+          DAILY_TENANT_DELIVERY_LIMIT: 200
+          DAILY_GLOBAL_DELIVERY_LIMIT: 200
+          LOG_LEVEL: error
+        run: pnpm --filter @rwp/web test:load 100 4

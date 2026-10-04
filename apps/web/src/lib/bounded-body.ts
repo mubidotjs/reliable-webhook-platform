@@ -23,9 +23,18 @@ export async function readBoundedBody(
       }
       chunks.push(value);
     }
-    return new TextDecoder("utf-8", { fatal: true }).decode(
-      Buffer.concat(chunks),
-    );
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(
+        Buffer.concat(chunks),
+      );
+    } catch {
+      throw new ApiError(
+        400,
+        "INVALID_ENCODING",
+        "Invalid encoding",
+        "The request must use valid UTF-8.",
+      );
+    }
   } finally {
     reader.releaseLock();
   }

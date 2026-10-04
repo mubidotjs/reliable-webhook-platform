@@ -1,3 +1,4 @@
+import { deliveryLog } from "@/modules/deliveries/log";
 import { handleApiRequest } from "@/lib/api-request";
 import { ApiError } from "@/lib/api-errors";
 import { readBoundedBody } from "@/lib/bounded-body";
@@ -15,13 +16,17 @@ export async function POST(request: Request): Promise<Response> {
         body,
         "/api/internal/deliveries/recover",
       ))
-    )
+    ) {
+      deliveryLog("queue.invalid_signature", {
+        reason: "INVALID_QUEUE_SIGNATURE",
+      });
       throw new ApiError(
         401,
         "INVALID_QUEUE_SIGNATURE",
         "Unauthorized",
         "A valid queue signature is required.",
       );
+    }
     await recoverAndDispatch();
     return new Response(null, { status: 204 });
   });

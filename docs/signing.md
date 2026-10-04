@@ -27,3 +27,19 @@ timestamp: 1725000000
 raw body: {"type":"invoice.paid"}
 signature: v1=omZcTTBuJJnULdTyA-qozSZy5vVKVPYyakdi4c4TZ4g
 ```
+
+## Consumer implementation
+
+Read `webhook-id`, `webhook-timestamp` and `webhook-signature`. Reject timestamps more than five minutes from your clock; verify raw bytes before parsing JSON. The tested [verifyReceivedWebhook implementation](../apps/receiver/src/verified-example.ts) and runnable receiver include constant-time comparison and a durable SQLite receipt example.
+
+```ts
+import { verifyReceivedWebhook } from "./verified-example";
+
+// rawBody is a bounded Buffer, collected before JSON parsing.
+if (!verifyReceivedWebhook(secret, eventId, timestamp, rawBody, signature)) {
+  return new Response("Invalid signature", { status: 401 });
+}
+// Commit event-ID deduplication and the business update atomically.
+```
+
+Replay preserves the event ID; receivers may intentionally ignore previously processed events. A valid signature authenticates bytes, not business processing. If raising EVENT_BODY_LIMIT_BYTES, adjust consumer limits for that size plus envelope overhead.

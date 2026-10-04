@@ -26,7 +26,7 @@ export async function POST(
     );
     let raw: unknown;
     try {
-      raw = JSON.parse(await readBoundedBody(request));
+      raw = JSON.parse(await readBoundedBody(request, 16 * 1024));
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new ApiError(

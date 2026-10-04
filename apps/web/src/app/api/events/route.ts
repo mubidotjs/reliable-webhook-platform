@@ -1,3 +1,4 @@
+import { parseHardeningEnvironment } from "@rwp/config";
 import { after } from "next/server";
 import { createEventSchema } from "@rwp/contracts";
 import {
@@ -17,7 +18,10 @@ export async function POST(request: Request): Promise<Response> {
   return handleApiRequest(request, async (correlationId) => {
     const actor = await requireWorkspace(request, correlationId);
     requireTrustedOrigin(request);
-    const raw = await readBoundedBody(request);
+    const raw = await readBoundedBody(
+      request,
+      parseHardeningEnvironment(process.env).EVENT_BODY_LIMIT_BYTES,
+    );
     let body: unknown;
     try {
       body = JSON.parse(raw);

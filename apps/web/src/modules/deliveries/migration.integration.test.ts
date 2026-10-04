@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { Client } from "pg";
 import { describe, it, expect } from "vitest";
 describe.runIf(Boolean(process.env.DATABASE_URL))(
-  "M3 migration upgrade",
+  "M3/M4 migration upgrade",
   () => {
     it("preserves populated M2 history and permits replay without permitting a second original", async () => {
       const client = new Client({ connectionString: process.env.DATABASE_URL });
@@ -58,6 +58,15 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
           await readFile(
             new URL(
               "../../../prisma/migrations/20260916120000_operations_ui/migration.sql",
+              import.meta.url,
+            ),
+            "utf8",
+          ),
+        );
+        await client.query(
+          await readFile(
+            new URL(
+              "../../../prisma/migrations/20260926120000_v1_hardening/migration.sql",
               import.meta.url,
             ),
             "utf8",

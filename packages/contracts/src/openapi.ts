@@ -56,6 +56,39 @@ export function createOpenApiDocument(): ReturnType<
     },
   );
   const security = [{ [sessionCookie.name]: [] }];
+  for (const [path, status] of [
+    ["/api/health/live", "ok"],
+    ["/api/health/ready", "ready"],
+  ] as const) {
+    registry.registerPath({
+      method: "get",
+      path,
+      summary:
+        status === "ok"
+          ? "Process liveness"
+          : "Database and configuration readiness",
+      responses: {
+        200: response(
+          z.object({
+            service: z.literal("reliable-webhook-platform"),
+            status: z.literal(status),
+          }),
+          "Healthy.",
+        ),
+        ...(status === "ready"
+          ? {
+              503: response(
+                z.object({
+                  service: z.literal("reliable-webhook-platform"),
+                  status: z.literal("unavailable"),
+                }),
+                "Dependency unavailable; details are not exposed.",
+              ),
+            }
+          : {}),
+      },
+    });
+  }
   const idParams = z.object({
     id: endpointIdSchema.openapi({
       param: { name: "id", in: "path" },
@@ -79,10 +112,12 @@ export function createOpenApiDocument(): ReturnType<
         createEndpointResponseSchema,
         "Endpoint created; secret shown once.",
       ),
-      400: problem("Malformed JSON."),
+      400: problem("Malformed JSON or invalid UTF-8."),
       401: problem("Authentication required."),
       403: problem("Workspace or trusted origin required."),
       409: problem("Enabled endpoint limit reached."),
+      413: problem("Management body exceeds 16 KiB."),
+      429: problem("Workspace request limit reached; see Retry-After."),
       422: problem("Invalid input or unsafe destination."),
       503: problem("Destination DNS resolution failed."),
     },
@@ -130,11 +165,13 @@ export function createOpenApiDocument(): ReturnType<
     },
     responses: {
       200: response(endpointResponseSchema, "The updated endpoint."),
-      400: problem("Malformed JSON."),
+      400: problem("Malformed JSON or invalid UTF-8."),
       401: problem("Authentication required."),
       403: problem("Workspace or trusted origin required."),
       404: problem("Endpoint not found in the authenticated workspace."),
       409: problem("A disabled endpoint cannot be edited."),
+      413: problem("Management body exceeds 16 KiB."),
+      429: problem("Workspace request limit reached; see Retry-After."),
       422: problem("Invalid input or unsafe destination."),
       503: problem("Destination DNS resolution failed."),
     },
@@ -157,6 +194,7 @@ export function createOpenApiDocument(): ReturnType<
       403: problem("Workspace or trusted origin required."),
       404: problem("Endpoint not found in the authenticated workspace."),
       409: problem("A disabled endpoint cannot rotate secrets."),
+      429: problem("Workspace request limit reached; see Retry-After."),
     },
   });
 
@@ -174,14 +212,16 @@ export function createOpenApiDocument(): ReturnType<
         acceptedEventSchema,
         "Durably accepted, or an identical event already exists.",
       ),
-      400: problem("Malformed JSON."),
+      400: problem("Malformed JSON or invalid UTF-8."),
       401: problem("Authentication required."),
       403: problem("Workspace or trusted origin required."),
       404: problem("Endpoint not found."),
       409: problem("Conflicting event ID or disabled endpoint."),
-      413: problem("Body exceeds 256 KiB."),
+      413: problem("Body exceeds configured event limit (256 KiB by default)."),
       422: problem("Invalid input."),
-      429: problem("Daily acceptance quota reached."),
+      429: problem(
+        "Daily quota or workspace request limit reached; see Retry-After.",
+      ),
     },
   });
   registry.registerPath({
@@ -242,7 +282,9 @@ export function createOpenApiDocument(): ReturnType<
       ),
       413: problem("Request exceeds size limit."),
       422: problem("Invalid input or missing idempotency key."),
-      429: problem("Daily acceptance quota reached."),
+      429: problem(
+        "Daily quota or workspace request limit reached; see Retry-After.",
+      ),
     },
   });
   const generator = new OpenApiGeneratorV31(registry.definitions);
@@ -250,7 +292,7 @@ export function createOpenApiDocument(): ReturnType<
     openapi: "3.1.0",
     info: {
       title: "Reliable Webhook Platform API",
-      version: "1.0.0-m3",
+      version: "1.0.0-m4",
       description:
         "Workspace-scoped endpoint management and durable event ingestion.",
     },

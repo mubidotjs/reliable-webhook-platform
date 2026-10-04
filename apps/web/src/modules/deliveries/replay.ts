@@ -1,3 +1,4 @@
+import { recordMetric } from "./metrics";
 import { RETRY_WINDOW_MS } from "@rwp/domain";
 import { replayKeySchema, replayRequestSchema } from "@rwp/contracts";
 import type { PrismaClient } from "@/generated/prisma/client";
@@ -22,7 +23,7 @@ export function createReplayService(
     ) {
       key = parseRequest(replayKeySchema, key);
       parseRequest(replayRequestSchema, input);
-      deliveryLog("delivery.replay.requested", {
+      deliveryLog("delivery.replay_requested", {
         tenantId: actor.workspaceId,
         deliveryId: id,
         correlationId: actor.correlationId,
@@ -59,7 +60,7 @@ export function createReplayService(
                 "Conflicting replay key",
                 "This key was already used for another delivery.",
               );
-            return { deliveryId: existing.resourceId, created: false };
+            return { deliveryId: existing.resourceId, created: false as const };
           }
           if (existing)
             await tx.idempotencyRecord.delete({ where: { id: existing.id } });
@@ -109,7 +110,7 @@ export function createReplayService(
               correlationId: actor.correlationId,
             },
           });
-          await scheduleWork(tx, delivery.id, 1, now, now);
+          const outbox = await scheduleWork(tx, delivery.id, 1, now, now);
           await tx.idempotencyRecord.create({
             data: {
               workspaceId: actor.workspaceId,
@@ -130,16 +131,32 @@ export function createReplayService(
               metadata: { replayOfId: id, endpointId: endpoint.id },
             },
           });
-          return { deliveryId: delivery.id, created: true };
+          await recordMetric(tx, "deliveries.created", now);
+          await recordMetric(tx, "deliveries.replayed", now);
+          return {
+            deliveryId: delivery.id,
+            created: true as const,
+            outboxId: outbox.id,
+          };
         },
         { timeout: 15_000 },
       );
-      if (result.created)
-        deliveryLog("delivery.replay.created", {
+      if (result.created) {
+        deliveryLog("delivery.created", {
           tenantId: actor.workspaceId,
           deliveryId: result.deliveryId,
           correlationId: actor.correlationId,
         });
+        deliveryLog("outbox.created", {
+          deliveryId: result.deliveryId,
+          outboxId: result.outboxId,
+        });
+        deliveryLog("delivery.replay_created", {
+          tenantId: actor.workspaceId,
+          deliveryId: result.deliveryId,
+          correlationId: actor.correlationId,
+        });
+      }
       return { deliveryId: result.deliveryId };
     },
   };

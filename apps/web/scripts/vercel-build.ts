@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { validateRuntimeEnvironment } from "@rwp/config";
 import { buildForVercel, checkDatabase } from "./deployment";
 
 function run(script: string): void {
@@ -12,6 +13,8 @@ function run(script: string): void {
 }
 
 try {
+  if (process.env.VERCEL_ENV === "production")
+    validateRuntimeEnvironment(process.env);
   await buildForVercel(process.env.VERCEL_ENV, run, () =>
     checkDatabase(process.env),
   );

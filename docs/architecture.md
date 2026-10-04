@@ -60,3 +60,18 @@ The application owns retry timing and state. Queue-provider retries are disabled
 ## Runtime configuration
 
 Local development uses PostgreSQL and the outbox poller. Hosted configuration is designed for Vercel, Neon, and QStash, but M0 provisions none of them. Sensitive values remain server-only environment variables. Production must provide explicit credentials and must never use development fallbacks.
+
+## Retry, replay and trade-offs
+
+Failure → immutable attempt outcome → RETRY_SCHEDULED plus next-generation outbox in one transaction → delayed queue invocation → next attempt. Expired processing leases produce UNCERTAIN outcomes, and tokens fence stale completion. Remote receipt can still have happened, so consumers must deduplicate.
+
+Replay validates tenant, Origin, idempotency key and endpoint revision, then creates new delivery/outbox records from original event bytes and current endpoint snapshots.
+
+- **Transactional outbox:** acceptance survives queue outages, at the cost of extra persistence and recovery work.
+- **At least once:** remote side effects and local commits cannot share a transaction; uncertain outcomes make ambiguity explicit.
+- **QStash:** avoids a dedicated hosted worker but requires public callbacks and a functioning recovery schedule.
+- **Bounded retries:** control resources; prolonged outages may explicitly exhaust accepted work.
+- **Immutable attempts:** preserve audit evidence; replay cannot overwrite the past.
+- **Cursor pagination:** creation time plus ID gives deterministic bounded tenant reads; details have at most five attempts.
+- **PostgreSQL metrics/limits:** reuse infrastructure without Redis or a metrics cluster. Fixed metric dimensions avoid ID cardinality; global acceptance locking and aggregate contention limit throughput.
+- **No response bodies:** reduces leakage and untrusted storage, while sacrificing remote debug content.

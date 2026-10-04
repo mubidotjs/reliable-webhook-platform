@@ -1,7 +1,9 @@
+import { validateRuntimeEnvironment } from "@rwp/config";
 import { setTimeout as pollInterval } from "node:timers/promises";
 import { recoverAndDispatch } from "../src/modules/deliveries/outbox";
 import { deliveryLog } from "../src/modules/deliveries/log";
 import { db } from "../src/lib/db";
+validateRuntimeEnvironment(process.env);
 let stopped = false;
 process.on("SIGINT", () => {
   stopped = true;

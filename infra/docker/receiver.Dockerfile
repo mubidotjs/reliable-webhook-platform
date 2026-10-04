@@ -12,7 +12,8 @@ RUN pnpm --filter @rwp/receiver build
 RUN pnpm --filter @rwp/receiver deploy --prod --legacy /out
 
 FROM node:24-alpine AS runtime
-ENV NODE_ENV=production
+ENV NODE_ENV=development
+ENV HOST=0.0.0.0
 ENV PORT=4000
 WORKDIR /app
 

@@ -1,3 +1,4 @@
+import { parseHardeningEnvironment } from "@rwp/config";
 import type { Transaction } from "./store";
 import { ApiError } from "@/lib/api-errors";
 // Call after taking acceptance lock 721001, shared by ingestion and replay.
@@ -6,11 +7,12 @@ export async function consumeAcceptanceQuota(
   workspaceId: string,
   now: Date,
 ) {
+  const limits = parseHardeningEnvironment(process.env);
   const bucketStart = new Date(now);
   bucketStart.setUTCHours(0, 0, 0, 0);
   for (const [tenant, limit] of [
-    [null, 100],
-    [workspaceId, 25],
+    [null, limits.DAILY_GLOBAL_DELIVERY_LIMIT],
+    [workspaceId, limits.DAILY_TENANT_DELIVERY_LIMIT],
   ] as const) {
     const bucket = await tx.quotaBucket.findFirst({
       where: {
@@ -25,6 +27,7 @@ export async function consumeAcceptanceQuota(
         "DAILY_QUOTA_EXCEEDED",
         "Daily quota exceeded",
         "Try again after the next UTC day.",
+        Math.max(1, Math.ceil((+bucketStart + 86_400_000 - +now) / 1000)),
       );
     if (bucket)
       await tx.quotaBucket.update({

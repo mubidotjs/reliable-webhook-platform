@@ -1,3 +1,4 @@
+import { recordMetric } from "@/modules/deliveries/metrics";
 import { consumeAcceptanceQuota } from "@/modules/deliveries/quotas";
 import { createHash, randomUUID } from "node:crypto";
 import type { CreateEventInput } from "@rwp/contracts";
@@ -68,6 +69,7 @@ export function createEventService(
                   eventId: producerEventId,
                   deliveryId: delivery.id,
                   status: delivery.status,
+                  created: false as const,
                 };
               }
               // Lock against disablement and rotation while snapshotting endpoint configuration.
@@ -132,7 +134,13 @@ export function createEventService(
                   correlationId: actor.correlationId,
                 },
               });
-              await scheduleWork(tx, delivery.id, 1, acceptedAt, acceptedAt);
+              const outbox = await scheduleWork(
+                tx,
+                delivery.id,
+                1,
+                acceptedAt,
+                acceptedAt,
+              );
               await tx.auditEvent.create({
                 data: {
                   workspaceId: actor.workspaceId,
@@ -147,7 +155,11 @@ export function createEventService(
                   },
                 },
               });
+              await recordMetric(tx, "events.accepted", acceptedAt);
+              await recordMetric(tx, "deliveries.created", acceptedAt);
               return {
+                created: true as const,
+                outboxId: outbox.id,
                 eventId: producerEventId,
                 deliveryId: delivery.id,
                 status: delivery.status,
@@ -155,14 +167,26 @@ export function createEventService(
             },
             { timeout: 15_000 },
           );
-          deliveryLog("queued", {
+          const fields = {
             tenantId: actor.workspaceId,
             eventId: result.eventId,
             endpointId: input.endpointId,
             deliveryId: result.deliveryId,
             correlationId: actor.correlationId,
-          });
-          return result;
+          };
+          if (result.created) {
+            deliveryLog("event.accepted", fields);
+            deliveryLog("delivery.created", fields);
+            deliveryLog("outbox.created", {
+              ...fields,
+              outboxId: result.outboxId,
+            });
+          }
+          return {
+            eventId: result.eventId,
+            deliveryId: result.deliveryId,
+            status: result.status,
+          };
         } catch (error) {
           if (
             retry < 3 &&
