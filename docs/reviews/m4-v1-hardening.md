@@ -1,6 +1,6 @@
 # M4 — v1 hardening acceptance
 
-Verified locally on 2026-09-26 on branch `feature/m4-v1-hardening`. Local implementation and regression verification are complete. **M4/v1 final sign-off remains pending live deployment and QStash evidence.** No production deployment, remote CI run or live OAuth/provider smoke test is claimed.
+Verified locally on 2026-09-26 on branch `feature/m4-v1-hardening`. Local implementation and regression verification are complete. **M4/v1 final sign-off remains pending live deployment and QStash evidence.** The original local verification did not include hosted acceptance; updated release checks and remote CI evidence are recorded below.
 
 ## Implemented
 
@@ -95,7 +95,7 @@ Readiness uses bounded connectivity plus `SELECT 1`, not optional provider probe
 
 Intermediate failures were corrected: new health routes required updating the OpenAPI expectation, strict types required narrowing new result variants, and Fastify required safe placeholder message/stack fields in its error serializer. On resumption Docker was stopped; the database checks were rerun successfully after restarting the same disposable service. No test was skipped to hide a failure.
 
-The browser run printed one Next.js early-closed-stream diagnostic during navigation; all browser assertions passed. Remote GitHub Actions and a full receiver Docker image build were not executed; Compose validation and receiver compilation were performed.
+The browser run printed one Next.js early-closed-stream diagnostic during navigation; all browser assertions passed. The original verification did not execute remote GitHub Actions or a full receiver Docker image build; the release-check section below records subsequent remote CI. Compose validation and receiver compilation were performed.
 
 ## Deployment
 
@@ -120,3 +120,43 @@ No dependencies were added or upgraded. Compatibility history columns and useful
 - One-time secret display is intentionally preserved; eliminating it would require a different consumer-provisioning workflow.
 
 M0–M3 behavior passes regression coverage. M4 implementation passes local verification. **Do not mark M4 or Reliable Webhook Platform v1 COMPLETE until the hosted acceptance evidence is recorded.**
+
+## Release verification — 2026-10-04
+
+Implementation commit: `4e4e607`. Current `main` was incorporated through normal merge commit `aa6259c5cdab6117d38af11c808dc07169ac1f23`, without history rewriting. The feature branch was pushed normally and [draft PR #9](https://github.com/mubidotjs/reliable-webhook-platform/pull/9) targets `main`.
+
+The full local release matrix passed again using Node 24.19.0, pnpm 11.19.0 and disposable loopback PostgreSQL 17 databases: frozen-lockfile installation, Prisma generation/validation, all six fresh migrations, migration status, formatting, lint, typecheck, 81 unit tests, 44 integration tests, OpenAPI synchronization, production build and 21 Playwright tests. Git whitespace checks passed. No application correction was needed.
+
+Docker stopped during an execution pause, causing a database-unreachable integration run. After restart, one exhaustion test exceeded its five-second test timeout while a production build competed for resources. The complete integration suite then passed when run alone, without changing timeouts or skipping tests. Playwright again printed the early-closed-stream diagnostic while all assertions passed.
+
+The separate 100-event/four-worker load smoke passed: 100 successful deliveries, 110 attempts and 100 unique history rows; ingestion p95 282.46 ms and history-page p95 19.98 ms. This remains signed loopback HTTP with accelerated retry timing, excluding live QStash/public TLS. The original 1,000-event evidence is unchanged.
+
+[GitHub Actions run 37208872700](https://github.com/mubidotjs/reliable-webhook-platform/actions/runs/37208872700) passed for `aa6259c5cdab6117d38af11c808dc07169ac1f23`, including every `verify` step, Playwright, migration deployment and the isolated load smoke. Any subsequent evidence commit must also pass its own PR checks before merge.
+
+A targeted scan of 217 tracked/non-ignored files found no high-confidence private-key/access-token markers. A separate database-URL match was the synthetic readiness-test fixture. No secret environment files, accidental build outputs or temporary implementation helpers were staged.
+
+## Hosted Acceptance / Final Sign-off — 2026-10-04
+
+**PENDING — M4/v1 is not signed off and PR #9 must remain unmerged.**
+
+| Gate                                           | Observed evidence / remaining work                                                                                                                                                                                                                        |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remote CI                                      | PASS for the implementation/merge revision above; require green checks on the final PR revision too.                                                                                                                                                      |
+| Existing Vercel preview build                  | [Deployment BvwUQcGNn2uz56pn7RVfwzyRySVi](https://vercel.com/mubidotjs-projects/reliable-webhook-platform-receiver/BvwUQcGNn2uz56pn7RVfwzyRySVi) completed successfully. Deployment metadata confirms Root Directory `apps/web`.                          |
+| Public hosted readiness                        | NOT VERIFIED. The [M4 preview](https://reliable-webhook-platform-receive-git-d40993-mubidotjs-projects.vercel.app) returns HTTP 302 to Vercel SSO for the root and both health routes. This protected preview is not public callback acceptance evidence. |
+| Isolated staging/configuration/migrations      | PENDING. Require a stable HTTPS origin, separate empty database, separate OAuth app and isolated QStash account. Do not reuse unverified preview or production credentials.                                                                               |
+| Genuine hosted OAuth/session/workspace         | PENDING; local mocked OAuth and browser fixtures do not satisfy this gate.                                                                                                                                                                                |
+| Real signed QStash callback / consumer HMAC    | PENDING, including rejection of unsigned and invalid callbacks.                                                                                                                                                                                           |
+| Hosted success / real delayed retry            | PENDING; preserve normal retry timing.                                                                                                                                                                                                                    |
+| Exhaustion / immutable history / linked replay | PENDING.                                                                                                                                                                                                                                                  |
+| Signed recovery schedule                       | PENDING; observe the actual five-minute signed invocation returning 204.                                                                                                                                                                                  |
+| Interrupted publication recovery               | PENDING; use isolated staging only and prove recovery without a new event or manual dispatch.                                                                                                                                                             |
+| Production smoke / release                     | PENDING after a gated merge; no production fault injection or v1 tag/release was performed.                                                                                                                                                               |
+
+The existing preview's successful build does not establish database isolation, configuration validity, public callback reachability or live OAuth/QStash behavior. Its SSO redirect must not be bypassed as acceptance evidence.
+
+The operator dashboard-access path is currently unavailable because the browser automation runtime cannot initialize. Continue with restored dashboard access or owner-provisioned scoped CLI/API access; keep credentials in secure provider settings or ignored local configuration, never this report or chat.
+
+For staging, retain `pnpm vercel-build` and production-mode validation/migrations in the isolated Vercel project. Set `APP_URL` and `BETTER_AUTH_URL` to its stable origin and register `<staging-origin>/api/auth/callback/github`. The existing recovery setup uses the fixed schedule ID `rwp-delivery-recovery`, so staging and production must use separate QStash namespaces/accounts. No new public API or architecture change is required.
+
+Once access is available, follow the [operations checklist](../m4-operations.md#production-smoke-checklist), record sanitized deployment/CI references, delivery/outbox/message IDs and timestamps, and replace the pending rows only with observed results. Keep the intentional future-work exclusions above. Final completion wording, final sign-off commit, merge and production release remain gated on the approved acceptance plan.
