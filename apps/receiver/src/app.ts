@@ -10,10 +10,28 @@ function parseStatus(value: string): number {
 }
 
 export function buildReceiver(): FastifyInstance {
+  if (process.env.NODE_ENV === "production")
+    throw new Error(
+      "Failure fixtures are development/test only; use the verified receiver for production.",
+    );
   const app = Fastify({
+    bodyLimit: 262144,
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
       redact: ["req.headers.authorization", "req.headers.cookie"],
+      serializers: {
+        req(request: { method: string }) {
+          return { method: request.method };
+        },
+        err(error: { statusCode?: number }) {
+          return {
+            type: "ReceiverError",
+            message: "Receiver request failed",
+            stack: "",
+            statusCode: error.statusCode,
+          };
+        },
+      },
     },
   });
   const sequences = new Map<string, number>();
@@ -55,11 +73,20 @@ export function buildReceiver(): FastifyInstance {
   }>("/receive/sequence/:name", async (request, reply) => {
     const statuses = (request.query.statuses ?? "500,200")
       .split(",")
-      .map(parseStatus);
+      .slice(0, 20)
+      .map((value) => (value === "timeout" ? "timeout" : parseStatus(value)));
     const currentIndex = sequences.get(request.params.name) ?? 0;
     const selected =
       statuses[Math.min(currentIndex, statuses.length - 1)] ?? 500;
+    if (!sequences.has(request.params.name) && sequences.size >= 1000)
+      return reply
+        .code(429)
+        .send({ error: "Reset a fixture sequence before adding another." });
     sequences.set(request.params.name, currentIndex + 1);
+    if (selected === "timeout") {
+      await new Promise((resolve) => setTimeout(resolve, 6000));
+      return { delayedByMs: 6000 };
+    }
     return reply.code(selected).send({
       attempt: currentIndex + 1,
       configuredStatus: selected,

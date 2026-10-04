@@ -572,4 +572,125 @@ describe.runIf(Boolean(process.env.DATABASE_URL))("M2 durable delivery", () => {
     await p.process(await f.job());
     expect((await f.history()).status).toBe("SUCCEEDED");
   });
+  it("does not double-count acceptance or success on duplicate requests", async () => {
+    const count = async (metric: string) =>
+      Number(
+        (
+          await db.metricAggregate.aggregate({
+            where: { metric },
+            _sum: { count: true },
+          })
+        )._sum.count ?? 0n,
+      );
+    const beforeAccepted = await count("events.accepted");
+    const beforeSuccess = await count("deliveries.succeeded");
+    const f = await fixture();
+    await Promise.all(
+      Array.from({ length: 4 }, () => f.ingest.ingest(f.actor, f.input)),
+    );
+    const p = f.processor(async () => ({
+      httpStatus: 200,
+      errorClass: null,
+      durationMs: 2,
+    }));
+    const job = await f.job();
+    await Promise.all(Array.from({ length: 4 }, () => p.process(job)));
+    expect(await count("events.accepted")).toBe(beforeAccepted + 1);
+    expect(await count("deliveries.succeeded")).toBe(beforeSuccess + 1);
+  });
+  it("serializes concurrent recovery and persists one uncertain outcome", async () => {
+    const f = await fixture();
+    let release!: () => void;
+    let started!: () => void;
+    const began = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const old = f.processor(async () => {
+      started();
+      await gate;
+      return { httpStatus: 200, errorClass: null, durationMs: 1 };
+    });
+    const running = old.process(await f.job());
+    await began;
+    f.jump(31000);
+    try {
+      await Promise.all([old.recover(), old.recover(), old.recover()]);
+    } finally {
+      release();
+      await running;
+    }
+    const history = await f.history();
+    expect(history.status).toBe("RETRY_SCHEDULED");
+    expect(history.attempts).toHaveLength(1);
+    expect(history.attempts[0]?.outcome?.status).toBe("UNCERTAIN");
+  });
+  it("records 429 retries with Retry-After and survives a new processor instance", async () => {
+    const f = await fixture();
+    await f
+      .processor(async () => ({
+        httpStatus: 429,
+        errorClass: null,
+        durationMs: 1,
+        retryAfter: "60",
+      }))
+      .process(await f.job());
+    expect(+(await f.history()).nextAttemptAt! - +f.clock()).toBe(60000);
+    await f.advance();
+    await f
+      .processor(async () => ({
+        httpStatus: 200,
+        errorClass: null,
+        durationMs: 1,
+      }))
+      .process(await f.job());
+    expect((await f.history()).status).toBe("SUCCEEDED");
+  });
+  it("does not let a stale publisher overwrite a newer successful claim", async () => {
+    const f = await fixture();
+    let release!: () => void;
+    let started!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const began = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const old = createOutboxPublisher({
+      database: db,
+      clock: f.clock,
+      queue: {
+        kind: "qstash",
+        publish: async () => {
+          started();
+          await gate;
+          throw new Error("stale failure");
+        },
+      },
+    });
+    const running = old.drain(1);
+    await began;
+    f.jump(31000);
+    try {
+      await createOutboxPublisher({
+        database: db,
+        clock: f.clock,
+        queue: { kind: "qstash", publish: async () => "new-owner" },
+      }).drain(1);
+    } finally {
+      release();
+      await running;
+    }
+    expect(
+      await db.outboxMessage.findUnique({
+        where: { id: (await f.job()).outboxId },
+      }),
+    ).toMatchObject({
+      status: "PUBLISHED",
+      providerId: "new-owner",
+      lastError: null,
+    });
+  });
 });

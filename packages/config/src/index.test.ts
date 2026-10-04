@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { parseEncryptionKeyring, parseServerEnvironment } from "./index";
+import {
+  parseEncryptionKeyring,
+  parseServerEnvironment,
+  parseHardeningEnvironment,
+  validateRuntimeEnvironment,
+} from "./index";
 
 const validEnvironment = {
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/app",
@@ -45,4 +50,48 @@ describe("server environment", () => {
       }),
     ).toThrow(/32-byte/);
   });
+});
+
+it("preserves conservative quota defaults and validates explicit overrides", () => {
+  expect(parseHardeningEnvironment({})).toMatchObject({
+    DAILY_TENANT_DELIVERY_LIMIT: 25,
+    DAILY_GLOBAL_DELIVERY_LIMIT: 100,
+    DAILY_PUBLICATION_LIMIT: 650,
+  });
+  expect(
+    parseHardeningEnvironment({ DAILY_TENANT_DELIVERY_LIMIT: "2000" })
+      .DAILY_TENANT_DELIVERY_LIMIT,
+  ).toBe(2000);
+  for (const value of ["0", "-1", "NaN", "1.5"])
+    expect(() =>
+      parseHardeningEnvironment({ EVENT_BODY_LIMIT_BYTES: value }),
+    ).toThrow();
+});
+it("validates all runtime configuration without exposing supplied secret values", () => {
+  const source = {
+    ...validEnvironment,
+    ENCRYPTION_KEY_VERSION: "v1",
+    ENCRYPTION_KEY_V1: Buffer.alloc(32, 7).toString("base64url"),
+  };
+  expect(validateRuntimeEnvironment(source).queue.QUEUE_ADAPTER).toBe("local");
+  expect(() =>
+    validateRuntimeEnvironment({
+      ...source,
+      BETTER_AUTH_SECRET: "private-value",
+    }),
+  ).toThrow("BETTER_AUTH_SECRET");
+  try {
+    validateRuntimeEnvironment({
+      ...source,
+      BETTER_AUTH_SECRET: "private-value",
+    });
+  } catch (error) {
+    expect(String(error)).not.toContain("private-value");
+  }
+  expect(() =>
+    validateRuntimeEnvironment({ ...source, VERCEL_ENV: "production" }),
+  ).toThrow("QUEUE_ADAPTER");
+  expect(() =>
+    validateRuntimeEnvironment({ ...source, QUEUE_ADAPTER: "qstash" }),
+  ).toThrow("QSTASH_TOKEN");
 });

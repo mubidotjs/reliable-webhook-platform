@@ -1,3 +1,4 @@
+import { deliveryLog } from "@/modules/deliveries/log";
 import { after } from "next/server";
 import { handleApiRequest } from "@/lib/api-request";
 import { ApiError } from "@/lib/api-errors";
@@ -20,13 +21,17 @@ export async function POST(request: Request): Promise<Response> {
         body,
         "/api/internal/deliveries/process",
       ))
-    )
+    ) {
+      deliveryLog("queue.invalid_signature", {
+        reason: "INVALID_QUEUE_SIGNATURE",
+      });
       throw new ApiError(
         401,
         "INVALID_QUEUE_SIGNATURE",
         "Unauthorized",
         "A valid queue signature is required.",
       );
+    }
     let parsed: unknown;
     try {
       parsed = JSON.parse(body);

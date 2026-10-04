@@ -294,6 +294,7 @@ model OutboxMessage {
   @@index([status, leaseExpiresAt], map: "outbox_messages_lease_idx")
   @@index([status, dueAt], map: "outbox_messages_due_idx")
   @@index([status, availableAt])
+  @@index([aggregateId, topic, generation, status], map: "outbox_aggregate_generation_status_idx")
   @@map("outbox_messages")
 }
 

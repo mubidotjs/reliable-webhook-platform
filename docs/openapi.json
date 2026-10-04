@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Reliable Webhook Platform API",
-    "version": "1.0.0-m3",
+    "version": "1.0.0-m4",
     "description": "Workspace-scoped endpoint management and durable event ingestion."
   },
   "servers": [
@@ -112,6 +112,104 @@
     "parameters": {}
   },
   "paths": {
+    "/api/health/live": {
+      "get": {
+        "summary": "Process liveness",
+        "responses": {
+          "200": {
+            "description": "Healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service": {
+                      "type": "string",
+                      "enum": [
+                        "reliable-webhook-platform"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "service",
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "summary": "Database and configuration readiness",
+        "responses": {
+          "200": {
+            "description": "Healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service": {
+                      "type": "string",
+                      "enum": [
+                        "reliable-webhook-platform"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "service",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable; details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service": {
+                      "type": "string",
+                      "enum": [
+                        "reliable-webhook-platform"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "service",
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/endpoints": {
       "post": {
         "summary": "Create a webhook endpoint",
@@ -241,7 +339,7 @@
             }
           },
           "400": {
-            "description": "Malformed JSON.",
+            "description": "Malformed JSON or invalid UTF-8.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -396,8 +494,86 @@
               }
             }
           },
+          "413": {
+            "description": "Management body exceeds 16 KiB.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ]
+                }
+              }
+            }
+          },
           "422": {
             "description": "Invalid input or unsafe destination.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Workspace request limit reached; see Retry-After.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1080,7 +1256,7 @@
             }
           },
           "400": {
-            "description": "Malformed JSON.",
+            "description": "Malformed JSON or invalid UTF-8.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1274,8 +1450,86 @@
               }
             }
           },
+          "413": {
+            "description": "Management body exceeds 16 KiB.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ]
+                }
+              }
+            }
+          },
           "422": {
             "description": "Invalid input or unsafe destination.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Workspace request limit reached; see Retry-After.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1584,6 +1838,45 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Workspace request limit reached; see Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -1695,7 +1988,7 @@
             }
           },
           "400": {
-            "description": "Malformed JSON.",
+            "description": "Malformed JSON or invalid UTF-8.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1890,7 +2183,7 @@
             }
           },
           "413": {
-            "description": "Body exceeds 256 KiB.",
+            "description": "Body exceeds configured event limit (256 KiB by default).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1968,7 +2261,7 @@
             }
           },
           "429": {
-            "description": "Daily acceptance quota reached.",
+            "description": "Daily quota or workspace request limit reached; see Retry-After.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3214,7 +3507,7 @@
             }
           },
           "429": {
-            "description": "Daily acceptance quota reached.",
+            "description": "Daily quota or workspace request limit reached; see Retry-After.",
             "content": {
               "application/problem+json": {
                 "schema": {

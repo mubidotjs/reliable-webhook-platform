@@ -1,3 +1,6 @@
+import { parseHardeningEnvironment } from "@rwp/config";
+import { recordMetric } from "./metrics";
+import { pruneOperationalCounters } from "./maintenance";
 import { parseQueueEnvironment } from "@rwp/config";
 import { randomUUID } from "node:crypto";
 import { LEASE_MS, RECOVERY_GRACE_MS } from "@rwp/domain";
@@ -54,13 +57,18 @@ export function createOutboxPublisher(
                 bucketStart,
               },
             });
-            if ((bucket?.count ?? 0) >= 650) {
+            if (
+              (bucket?.count ?? 0) >=
+              parseHardeningEnvironment(process.env).DAILY_PUBLICATION_LIMIT
+            ) {
               await tx.outboxMessage.update({
                 where: { id },
                 data: {
                   status: "PENDING",
                   availableAt: new Date(bucketStart.getTime() + 86_400_000),
                   lastError: "PUBLICATION_BUDGET",
+                  claimToken: null,
+                  leaseExpiresAt: null,
                 },
               });
               return null;
@@ -91,6 +99,10 @@ export function createOutboxPublisher(
           });
         });
         if (!claimed) break;
+        deliveryLog("outbox.publish_started", {
+          outboxId: claimed.id,
+          deliveryId: claimed.aggregateId,
+        });
         try {
           const job = deliveryJobSchema.parse({
             outboxId: claimed.id,
@@ -99,7 +111,7 @@ export function createOutboxPublisher(
           });
           const providerId = await queue.publish(job, claimed.dueAt);
           // A fast callback may already have consumed this item.
-          await database.outboxMessage.updateMany({
+          const published = await database.outboxMessage.updateMany({
             where: {
               id: claimed.id,
               status: "PUBLISHING",
@@ -114,12 +126,31 @@ export function createOutboxPublisher(
               lastError: null,
             },
           });
+          deliveryLog("outbox.published", {
+            outboxId: claimed.id,
+            deliveryId: claimed.aggregateId,
+            queueMessageId: providerId,
+          });
+          if (published.count) {
+            try {
+              await recordMetric(
+                database,
+                "outbox.delay_ms",
+                clock(),
+                Math.max(0, +clock() - +claimed.availableAt),
+              );
+            } catch {
+              deliveryLog("metrics.write_failed", {
+                reason: "METRIC_STORAGE_UNAVAILABLE",
+              });
+            }
+          }
         } catch {
           const delivery = await database.delivery.findUnique({
             where: { id: claimed.aggregateId },
             include: { event: true },
           });
-          deliveryLog("queue_failure", {
+          deliveryLog("outbox.publish_failed", {
             ...(delivery
               ? {
                   tenantId: delivery.workspaceId,
@@ -132,25 +163,29 @@ export function createOutboxPublisher(
             deliveryId: claimed.aggregateId,
             reason: "PUBLISH_FAILED",
           });
-          await database.outboxMessage.updateMany({
-            where: {
-              id: claimed.id,
-              status: "PUBLISHING",
-              claimToken: claimed.claimToken,
-            },
-            data: {
-              status: "PENDING",
-              availableAt: new Date(
-                clock().getTime() +
-                  Math.min(
-                    300_000,
-                    1000 * 2 ** Math.min(claimed.publishCount, 8),
-                  ),
-              ),
-              claimToken: null,
-              leaseExpiresAt: null,
-              lastError: "PUBLISH_FAILED",
-            },
+          await database.$transaction(async (tx) => {
+            const failed = await tx.outboxMessage.updateMany({
+              where: {
+                id: claimed.id,
+                status: "PUBLISHING",
+                claimToken: claimed.claimToken,
+              },
+              data: {
+                status: "PENDING",
+                availableAt: new Date(
+                  clock().getTime() +
+                    Math.min(
+                      300_000,
+                      1000 * 2 ** Math.min(claimed.publishCount, 8),
+                    ),
+                ),
+                claimToken: null,
+                leaseExpiresAt: null,
+                lastError: "PUBLISH_FAILED",
+              },
+            });
+            if (failed.count)
+              await recordMetric(tx, "outbox.publish_failed", clock());
           });
         }
       }
@@ -161,6 +196,7 @@ export function createOutboxPublisher(
 export async function recoverAndDispatch() {
   await createDeliveryProcessor().recover();
   await createOutboxPublisher().drain();
+  await pruneOperationalCounters();
 }
 export async function dispatchSafely() {
   try {

@@ -6,6 +6,7 @@ export class ApiError extends Error {
     public readonly code: string,
     public readonly title: string,
     public readonly safeDetail: string,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(code);
     this.name = "ApiError";
@@ -29,6 +30,9 @@ export function problemResponse(
     headers: {
       "cache-control": "no-store",
       "content-type": "application/problem+json",
+      ...(error.retryAfterSeconds
+        ? { "retry-after": String(error.retryAfterSeconds) }
+        : {}),
       "x-correlation-id": correlationId,
     },
   });

@@ -1,6 +1,6 @@
 # Reliable Webhook Platform
 
-A production-minded webhook delivery platform built as a TypeScript modular monolith. M1 provides secure endpoint configuration; M2 adds durable ingestion, signed delivery, retries, and crash recovery. Local verification is complete; live QStash milestone sign-off remains pending.
+A TypeScript modular monolith for durable, signed webhook delivery. It combines secure endpoints, a transactional outbox, bounded retries, crash recovery and an operations UI with immutable history and manual replay. M4 hardens observability, validation and deployment; hosted QStash sign-off remains pending.
 
 ## Implementation status
 
@@ -20,7 +20,7 @@ A production-minded webhook delivery platform built as a TypeScript modular mono
 - Transactional PostgreSQL outbox, local worker, and signed QStash callbacks
 - Append-only attempt history, bounded retries, and crash recovery
 
-See [M2 verification](docs/reviews/m2-durable-delivery.md) for test results and remaining live-demo requirements. Replay and its management UI remain deferred.
+See [M2 verification](docs/reviews/m2-durable-delivery.md) for test results and remaining live-demo requirements. M3 delivery history and manual replay are implemented. M4 adds telemetry, readiness, distributed request limits and a reproducible load harness; see [M4 acceptance evidence](docs/reviews/m4-v1-hardening.md).
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ The Compose database binds to host port `54329` by default to avoid common local
    pnpm install --frozen-lockfile
    ```
 
-2. Copy `.env.example` to `.env` and replace the development placeholders. Generate `BETTER_AUTH_SECRET` with at least 32 random bytes. Configure the GitHub OAuth callback as:
+2. Copy `.env.example` to `.env` and replace the development placeholders. Export it into the shell using [environment loading](docs/m4-operations.md#environment-loading) before the commands below. Generate `BETTER_AUTH_SECRET` with at least 32 random bytes. Configure the GitHub OAuth callback as:
 
    ```text
    http://localhost:3000/api/auth/callback/github
@@ -55,7 +55,7 @@ The Compose database binds to host port `54329` by default to avoid common local
    pnpm db:deploy
    ```
 
-4. Run both applications.
+4. Export `.env` in the command shell using [these instructions](docs/m4-operations.md#environment-loading), then run both applications. In another configured shell run `pnpm --filter @rwp/web worker` for local delivery dispatch.
 
    ```bash
    pnpm dev
@@ -95,7 +95,7 @@ See [Architecture](docs/architecture.md) for boundaries and data flow. No cloud 
 
 ## Data handling
 
-The public demo is intended for synthetic payloads only. Do not submit employer, customer, credential, personal, or regulated data. The planned v1 retention job removes sensitive delivery history after 30 days; that behavior is implemented and tested in M4.
+The public demo is intended for synthetic payloads only. Do not submit employer, customer, credential, personal, or regulated data. Automatic delivery-history deletion is not implemented. Manage retention and capacity explicitly; M4 prunes only stale authentication and mutation request counters.
 
 ## License
 
@@ -138,3 +138,36 @@ The workspace has Overview, Endpoints, Events, Deliveries, and Setup guide navig
 ## M3 operations
 
 Inspect delivery history, attempts, retry schedules, and confirmed replays in the dashboard. See [M3 — Operations UI](docs/m3-operations.md) for routes, replay semantics, local demonstrations, and verification.
+
+## Guarantees and lifecycle
+
+The project demonstrates persistence boundaries, concurrency, tenant isolation and recovery in asynchronous integrations.
+
+```text
+Producer → Event API → PostgreSQL transaction (Event + Delivery + Outbox)
+                                     ↓
+                              Publisher → QStash → Processor → Destination
+                                                       ↓
+                                              Immutable attempt outcome
+                                                       ↓
+                                         Success / durable retry / terminal state
+```
+
+A 202 means work is durably committed. Delivery is **at least once**: a crash after receipt but before success persistence can cause duplicate requests. Consumers should atomically deduplicate `webhook-id` with their business update. There is no exactly-once or eventual-success promise.
+
+Automatic retries use at most five attempts within 24 hours, equal-jitter exponential delays and bounded Retry-After. Replay creates a new delivery using the original event and current endpoint configuration, preserving all prior attempts. See [retry details](docs/m2-delivery.md) and [replay semantics](docs/m3-operations.md).
+
+## API and security
+
+Sessions supply tenant context; mutations require the configured Origin. Main routes are `/v1/endpoints`, `/api/events`, `/api/deliveries` and `/api/deliveries/:id/replay`. [OpenAPI](docs/openapi.json) documents the contract. Producer API-key authentication remains future work.
+
+Signing secrets use versioned AES-256-GCM and are shown once at creation/rotation. Outbound bodies use HMAC-SHA256; see [verification](docs/signing.md). QStash verifies exact bodies and callback URLs. Destinations require public HTTPS port 443 addresses, checked again when connecting. Redirects are not followed and response bodies are not stored.
+
+## Operations, demonstrations and roadmap
+
+- [M4 operations](docs/m4-operations.md): limits, logs, durable metrics, readiness and production verification.
+- [Portfolio demonstration](docs/demo.md): retry, process restart, exhaustion and replay.
+- [Load testing](docs/load-testing.md): repeatable workload and measurement limits.
+- [Architecture](docs/architecture.md): design choices and trade-offs.
+
+M0–M3 functionality is retained. M4/v1 sign-off requires the [acceptance evidence](docs/reviews/m4-v1-hardening.md), including hosted verification. Future work includes retention, producer API keys, richer analytics and scaling beyond public-demo quotas.

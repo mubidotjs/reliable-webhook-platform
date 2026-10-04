@@ -1,0 +1,42 @@
+{
+  "runDate": "2026-09-26",
+  "environment": {
+    "node": "v24.19.0",
+    "packageManager": "pnpm 11.19.0",
+    "platform": "Windows x64",
+    "cpu": "Intel Core i7-6600U @ 2.60GHz",
+    "logicalCpus": 4,
+    "memoryGiB": 16,
+    "database": "PostgreSQL 17 in Docker, loopback only"
+  },
+  "scenario": {
+    "events": 1000,
+    "endpoints": 3,
+    "concurrency": 8,
+    "firstAttemptFailurePercent": 10
+  },
+  "results": {
+    "succeeded": 1000,
+    "attempts": 1100,
+    "historyRows": 1000,
+    "ingestionMs": 43752,
+    "ingestionP95Ms": 494.88,
+    "deliveryMs": 34286,
+    "historyP95Ms": 22.01
+  },
+  "recoveryLookup": {
+    "nodeType": "Index Scan",
+    "index": "outbox_aggregate_generation_status_idx",
+    "planningMs": 0.116,
+    "executionMs": 0.086,
+    "sharedHitBlocks": 5,
+    "sharedReadBlocks": 0
+  },
+  "limitations": [
+    "Service-level ingestion excludes HTTP, authentication and rate-limit middleware.",
+    "Real signed loopback HTTP uses an injected test transport and local queue.",
+    "Retry time is accelerated; this is not a QStash or public TLS benchmark.",
+    "Other local verification processes were active; timings are illustrative rather than isolated capacity measurements.",
+    "The query plan measures one recovery lookup against completed delivery data, not every production filter combination."
+  ]
+}

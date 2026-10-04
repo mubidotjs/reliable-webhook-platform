@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildReceiver } from "./app";
 
@@ -40,4 +40,25 @@ describe("failure-injection receiver", () => {
     expect(first.statusCode).toBe(503);
     expect(second.statusCode).toBe(200);
   });
+});
+
+it("rejects production use of diagnostic failure fixtures", () => {
+  vi.stubEnv("NODE_ENV", "production");
+  try {
+    expect(() => buildReceiver()).toThrow("development/test only");
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+it("bounds diagnostic receiver request bodies", async () => {
+  const receiver = buildReceiver();
+  receivers.push(receiver);
+  const response = await receiver.inject({
+    method: "POST",
+    url: "/receive/success",
+    headers: { "content-type": "text/plain" },
+    payload: "x".repeat(262145),
+  });
+  expect(response.statusCode).toBe(413);
 });

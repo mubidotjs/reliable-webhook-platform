@@ -1,3 +1,4 @@
+import { recordMetric } from "./metrics";
 import { randomUUID } from "node:crypto";
 import {
   parseEncryptionKeyring,
@@ -58,14 +59,23 @@ export function createDeliveryProcessor(options: Options = {}) {
     const event = await tx.webhookEvent.findUniqueOrThrow({
       where: { id: delivery.eventId },
     });
-    deliveryLog(status === "CANCELLED" ? "cancelled" : "exhausted", {
-      tenantId: delivery.workspaceId,
-      eventId: event.producerEventId,
-      endpointId: delivery.endpointId,
-      deliveryId: delivery.id,
-      correlationId: delivery.correlationId,
-      reason,
-    });
+    await recordMetric(
+      tx,
+      status === "CANCELLED" ? "deliveries.cancelled" : "deliveries.exhausted",
+      now,
+    );
+    return {
+      event:
+        status === "CANCELLED" ? "delivery.cancelled" : "delivery.exhausted",
+      fields: {
+        tenantId: delivery.workspaceId,
+        eventId: event.producerEventId,
+        endpointId: delivery.endpointId,
+        deliveryId: delivery.id,
+        correlationId: delivery.correlationId,
+        reason,
+      },
+    };
   }
 
   async function finish(
@@ -143,13 +153,37 @@ export function createDeliveryProcessor(options: Options = {}) {
             decision.nextAttemptAt,
             now,
           );
+        if (!uncertain)
+          await recordMetric(tx, "attempt.duration_ms", now, result.durationMs);
+        if (decision.status === "SUCCEEDED") {
+          await recordMetric(tx, "deliveries.succeeded", now);
+          await recordMetric(
+            tx,
+            "delivery.acceptance_to_success_ms",
+            now,
+            +now - +delivery.event.createdAt,
+          );
+        } else {
+          await recordMetric(tx, "attempts.failed", now);
+          await recordMetric(
+            tx,
+            retrying ? "retries.scheduled" : "deliveries.exhausted",
+            now,
+          );
+        }
         return {
+          attemptEvent:
+            decision.status === "SUCCEEDED"
+              ? "attempt.succeeded"
+              : "attempt.failed",
+          durationMs: uncertain ? undefined : result.durationMs,
+          retrying,
           event:
             decision.status === "SUCCEEDED"
-              ? "success"
+              ? "delivery.succeeded"
               : retrying
-                ? "retry_scheduled"
-                : "exhausted",
+                ? "delivery.retry_scheduled"
+                : "delivery.exhausted",
           fields: {
             tenantId: delivery.workspaceId,
             eventId: delivery.event.producerEventId,
@@ -162,12 +196,25 @@ export function createDeliveryProcessor(options: Options = {}) {
         };
       })
       .then((result) => {
-        if (result) deliveryLog(result.event, result.fields);
+        if (result) {
+          deliveryLog(result.attemptEvent, {
+            ...result.fields,
+            ...(result.durationMs === undefined
+              ? {}
+              : { durationMs: result.durationMs }),
+          });
+          deliveryLog(result.event, result.fields);
+          if (result.retrying) deliveryLog("outbox.created", result.fields);
+        }
       });
   }
 
   return {
     async process(job: DeliveryJob) {
+      deliveryLog("queue.received", {
+        deliveryId: job.deliveryId,
+        outboxId: job.outboxId,
+      });
       const claimed = await database.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM deliveries WHERE id = ${job.deliveryId} FOR UPDATE`;
         const delivery = await tx.delivery.findUnique({
@@ -193,23 +240,31 @@ export function createDeliveryProcessor(options: Options = {}) {
           where: { id: delivery.endpointId },
         });
         if (endpoint.status === "DISABLED") {
-          await terminate(tx, delivery, "CANCELLED", "ENDPOINT_DISABLED", now);
-          return null;
+          return {
+            terminated: await terminate(
+              tx,
+              delivery,
+              "CANCELLED",
+              "ENDPOINT_DISABLED",
+              now,
+            ),
+          };
         }
         if (
           now >= delivery.retryDeadline ||
           delivery.attemptCount >= MAX_ATTEMPTS
         ) {
-          await terminate(
-            tx,
-            delivery,
-            "EXHAUSTED",
-            now >= delivery.retryDeadline
-              ? "RETRY_WINDOW_EXPIRED"
-              : "ATTEMPT_LIMIT",
-            now,
-          );
-          return null;
+          return {
+            terminated: await terminate(
+              tx,
+              delivery,
+              "EXHAUSTED",
+              now >= delivery.retryDeadline
+                ? "RETRY_WINDOW_EXPIRED"
+                : "ATTEMPT_LIMIT",
+              now,
+            ),
+          };
         }
         if (delivery.nextAttemptAt && delivery.nextAttemptAt > now) return null;
         const token = randomUUID();
@@ -231,17 +286,40 @@ export function createDeliveryProcessor(options: Options = {}) {
             leaseExpiresAt: new Date(now.getTime() + LEASE_MS),
           },
         });
+        await recordMetric(
+          tx,
+          "queue.delay_ms",
+          now,
+          Math.max(0, +now - +work.dueAt),
+        );
         return { delivery, attempt, token };
       });
-      if (!claimed) return;
+      if (!claimed) {
+        deliveryLog("queue.duplicate", {
+          deliveryId: job.deliveryId,
+          outboxId: job.outboxId,
+          reason: "NO_ELIGIBLE_WORK",
+        });
+        return;
+      }
+      if ("terminated" in claimed) {
+        deliveryLog(claimed.terminated.event, claimed.terminated.fields);
+        return;
+      }
       const { delivery, attempt, token } = claimed;
-      deliveryLog("processing", {
+      deliveryLog("delivery.processing", {
         tenantId: delivery.workspaceId,
         eventId: delivery.event.producerEventId,
         endpointId: delivery.endpointId,
         deliveryId: delivery.id,
         attemptId: attempt.id,
         correlationId: delivery.correlationId,
+      });
+      deliveryLog("attempt.started", {
+        tenantId: delivery.workspaceId,
+        deliveryId: delivery.id,
+        attemptId: attempt.id,
+        outboxId: job.outboxId,
       });
       let result: SendResult;
       let key: Buffer;
@@ -288,7 +366,7 @@ export function createDeliveryProcessor(options: Options = {}) {
               timestamp,
               delivery.event.deliveryBody,
             ),
-            "user-agent": "reliable-webhook-platform/0.2",
+            "user-agent": "reliable-webhook-platform/1.0",
           },
         });
       } catch {
@@ -313,6 +391,7 @@ export function createDeliveryProcessor(options: Options = {}) {
           status: "PROCESSING",
           OR: [{ leaseExpiresAt: { lte: now } }, { leaseExpiresAt: null }],
         },
+        orderBy: [{ leaseExpiresAt: "asc" }, { id: "asc" }],
         take: limit,
       });
       for (const delivery of stale) {
@@ -348,12 +427,12 @@ export function createDeliveryProcessor(options: Options = {}) {
       const pending = await database.$queryRaw<{ id: string }[]>`
         SELECT d.id FROM deliveries d JOIN webhook_endpoints e ON e.id = d."endpointId"
         WHERE d.status IN ('PENDING', 'RETRY_SCHEDULED') AND (
-          e.status = 'DISABLED' OR d."retryDeadline" <= ${now} OR d."attemptCount" >= 5 OR
+          e.status = 'DISABLED' OR d."retryDeadline" <= ${now} OR d."attemptCount" >= ${MAX_ATTEMPTS} OR
           NOT EXISTS (SELECT 1 FROM outbox_messages o WHERE o."aggregateId" = d.id
             AND o.topic = 'delivery' AND o.generation = d.generation AND o.status != 'CONSUMED')
         ) ORDER BY d."nextAttemptAt", d.id LIMIT ${limit}`;
       for (const candidate of pending) {
-        await database.$transaction(async (tx) => {
+        const terminated = await database.$transaction(async (tx) => {
           await tx.$queryRaw`SELECT id FROM deliveries WHERE id = ${candidate.id} FOR UPDATE`;
           const delivery = await tx.delivery.findUniqueOrThrow({
             where: { id: candidate.id },
@@ -363,7 +442,7 @@ export function createDeliveryProcessor(options: Options = {}) {
             where: { id: delivery.endpointId },
           });
           if (endpoint.status === "DISABLED")
-            await terminate(
+            return terminate(
               tx,
               delivery,
               "CANCELLED",
@@ -374,7 +453,7 @@ export function createDeliveryProcessor(options: Options = {}) {
             delivery.retryDeadline <= now ||
             delivery.attemptCount >= MAX_ATTEMPTS
           )
-            await terminate(
+            return terminate(
               tx,
               delivery,
               "EXHAUSTED",
@@ -406,6 +485,7 @@ export function createDeliveryProcessor(options: Options = {}) {
             }
           }
         });
+        if (terminated) deliveryLog(terminated.event, terminated.fields);
       }
     },
   };

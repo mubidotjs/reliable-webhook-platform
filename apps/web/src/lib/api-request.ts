@@ -1,3 +1,6 @@
+import { readBoundedBody } from "./bounded-body";
+import { enforceMutationLimit } from "./rate-limit";
+import { recordFailure } from "@/modules/deliveries/metrics";
 import { randomUUID } from "node:crypto";
 import { errorDiagnostic } from "./error-diagnostic";
 
@@ -46,6 +49,10 @@ export async function requireWorkspace(
       "Complete workspace onboarding before managing endpoints.",
     );
   }
+  if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+    requireTrustedOrigin(request);
+    await enforceMutationLimit(workspace.id);
+  }
   return { correlationId, userId: session.user.id, workspaceId: workspace.id };
 }
 
@@ -75,8 +82,9 @@ export function requireTrustedOrigin(request: Request): void {
 
 export async function parseJsonBody(request: Request): Promise<unknown> {
   try {
-    return await request.json();
-  } catch {
+    return JSON.parse(await readBoundedBody(request, 16 * 1024));
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
     throw new ApiError(
       400,
       "MALFORMED_JSON",
@@ -96,6 +104,9 @@ export async function handleApiRequest(
   } catch (error) {
     if (error instanceof ApiError) {
       return problemResponse(error, correlationId);
+    }
+    if (new URL(request.url).pathname.startsWith("/api/internal/deliveries/")) {
+      await recordFailure("queue.processing_failed");
     }
     console.error(
       JSON.stringify({

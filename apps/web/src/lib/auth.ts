@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth/minimal";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 
 import { db } from "@/lib/db";
+import { consumeAuthLimit } from "./auth-rate-limit";
 
 const developmentSecret = "development-only-secret-change-before-deploying";
 
@@ -23,6 +24,13 @@ export const auth = betterAuth({
     provider: "postgresql",
   }),
   secret: runtimeValue("BETTER_AUTH_SECRET", developmentSecret),
+  rateLimit: { customStorage: { consume: consumeAuthLimit } },
+  logger: {
+    // Provider/library diagnostics can include tokens or raw requests.
+    log(level) {
+      console.error(JSON.stringify({ event: "auth.diagnostic", level }));
+    },
+  },
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
