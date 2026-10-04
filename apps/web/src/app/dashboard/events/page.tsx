@@ -8,6 +8,7 @@ import {
   Time,
 } from "@/components/dashboard/common";
 import { EventForm } from "@/components/dashboard/event-form";
+import { FormDisclosure } from "@/components/dashboard/form-disclosure";
 export default async function EventsPage({
   searchParams,
 }: {
@@ -26,36 +27,69 @@ export default async function EventsPage({
         description="Submit an event once and follow its durable delivery. Reusing the same event ID and content returns the original delivery."
       />
       {endpoints.length ? (
-        <EventForm endpoints={endpoints} />
+        <FormDisclosure
+          title="Send test event"
+          initiallyOpen={!cursor && !result.data.length}
+        >
+          <EventForm endpoints={endpoints} />
+        </FormDisclosure>
       ) : (
-        <EmptyState>
-          You need an enabled endpoint before sending an event.{" "}
-          <RecordLink href="/dashboard/endpoints">Add an endpoint</RecordLink>.
-        </EmptyState>
+        <div className="mb-6">
+          <EmptyState>
+            You need an enabled endpoint before sending an event.{" "}
+            <RecordLink href="/dashboard/endpoints">Add an endpoint</RecordLink>
+            .
+          </EmptyState>
+        </div>
       )}
-      <h2 className="mb-4 mt-8 text-lg font-semibold">Accepted events</h2>
+      <h2 className="mb-4 text-lg font-semibold">Accepted events</h2>
       {!result.data.length ? (
         <EmptyState>
-          No events have been accepted in this workspace yet.
+          {cursor
+            ? "No older events on this page."
+            : "No events have been accepted in this workspace yet."}
         </EmptyState>
       ) : (
-        <div className="space-y-3">
-          {result.data.map((e) => (
-            <article
-              key={e.id}
-              className="rounded-xl border border-slate-800 p-5"
-            >
-              <RecordLink href={`/dashboard/events/${e.id}`}>
-                {e.type}
-              </RecordLink>
-              <p className="mt-2 break-all font-mono text-xs text-slate-400">
-                {e.producerEventId}
-              </p>
-              <p className="mt-2 text-xs text-slate-500">
-                <Time value={e.createdAt} />
-              </p>
-            </article>
-          ))}
+        <div
+          className="table-region"
+          role="region"
+          aria-label="Event records"
+          tabIndex={0}
+        >
+          <table className="data-table min-w-[640px]">
+            <caption className="sr-only">Accepted events</caption>
+            <thead>
+              <tr>
+                {["Event type", "Producer event ID", "Accepted (UTC)"].map(
+                  (label) => (
+                    <th key={label} scope="col">
+                      {label}
+                    </th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {result.data.map((e) => (
+                <tr key={e.id}>
+                  <td>
+                    <RecordLink href={"/dashboard/events/" + e.id}>
+                      {e.type}
+                    </RecordLink>
+                  </td>
+                  <td
+                    className="max-w-xs truncate font-mono text-xs"
+                    title={e.producerEventId}
+                  >
+                    {e.producerEventId}
+                  </td>
+                  <td className="text-xs">
+                    <Time value={e.createdAt} compact />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
       <Pagination

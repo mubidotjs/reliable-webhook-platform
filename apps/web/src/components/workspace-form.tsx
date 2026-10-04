@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { inputStyle } from "@/components/dashboard/common";
 import { Button } from "@/components/ui/button";
 import {
   createWorkspace,
@@ -35,7 +36,7 @@ export function WorkspaceForm(): React.ReactNode {
           }
           aria-invalid={Boolean(state?.errors?.name)}
           placeholder="Delivery Lab"
-          className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 px-4 text-base text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/20"
+          className={inputStyle}
         />
         {state?.errors?.name ? (
           <p id="workspace-name-error" className="mt-2 text-sm text-rose-300">

@@ -17,6 +17,7 @@ export function ReplayDialog({
 }) {
   const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
   const submitting = useRef(false);
   const intent = useRef<{ key: string; endpointRevision: string } | null>(null);
   const [snapshot, setSnapshot] = useState(target);
@@ -77,6 +78,7 @@ export function ReplayDialog({
   return (
     <>
       <Button
+        variant="secondary"
         disabled={!target.eligible}
         onClick={() => {
           if (!intent.current) {
@@ -84,12 +86,13 @@ export function ReplayDialog({
             setError("");
           }
           dialog.current?.showModal();
+          cancel.current?.focus();
         }}
       >
         Replay delivery
       </Button>
       {!target.eligible && (
-        <p className="text-xs text-slate-400">
+        <p className="max-w-xs text-xs text-muted">
           Replay requires a finished delivery and an enabled endpoint.
         </p>
       )}
@@ -100,9 +103,9 @@ export function ReplayDialog({
         onCancel={(e) => {
           if (submitting.current) e.preventDefault();
         }}
-        className="w-[calc(100%_-_2rem)] max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-6 text-slate-100 backdrop:bg-black/70"
+        className="dialog-surface"
       >
-        <h2 id="replay-title" className="text-xl font-semibold">
+        <h2 id="replay-title" className="text-lg font-semibold">
           Replay webhook delivery?
         </h2>
         <p
@@ -113,19 +116,21 @@ export function ReplayDialog({
           to the current destination, even if it was already received. The
           original delivery history will remain unchanged.
         </p>
-        <p className="my-4 break-all rounded bg-slate-950 p-3 font-mono text-sm">
+        <p className="mb-1 mt-4 text-xs text-muted">Current destination</p>
+        <p className="mb-4 break-all rounded bg-slate-950 p-3 font-mono text-sm">
           {snapshot.destinationUrl}
         </p>
         <p className="text-xs text-slate-400">
           Receivers may deduplicate this event using its unchanged event ID.
         </p>
         {error && (
-          <p role="alert" className="mt-4 text-sm text-red-300">
+          <p role="alert" className="feedback-error">
             {error}
           </p>
         )}
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
           <Button
+            ref={cancel}
             variant="secondary"
             disabled={busy}
             onClick={() => dialog.current?.close()}

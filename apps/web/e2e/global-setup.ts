@@ -51,6 +51,8 @@ export default async function globalSetup() {
   const outsider = await createAuthenticatedOwner(database, "M1 Outsider");
   const ui = await createAuthenticatedOwner(database, "Workspace UI");
   const m3 = await createAuthenticatedOwner(database, "Operations UI");
+  const refresh = await createAuthenticatedOwner(database, "UI Refresh");
+  process.env.E2E_REFRESH_COOKIE = refresh.cookieHeader;
   process.env.E2E_M3_COOKIE = m3.cookieHeader;
   process.env.E2E_M3_USER_ID = m3.userId;
   process.env.E2E_UI_COOKIE = ui.cookieHeader;
@@ -61,7 +63,13 @@ export default async function globalSetup() {
     const workspaces = await database.workspace.findMany({
       where: {
         ownerId: {
-          in: [primary.userId, outsider.userId, ui.userId, m3.userId],
+          in: [
+            primary.userId,
+            outsider.userId,
+            ui.userId,
+            m3.userId,
+            refresh.userId,
+          ],
         },
       },
     });
@@ -96,7 +104,15 @@ export default async function globalSetup() {
     });
     await database.user.deleteMany({
       where: {
-        id: { in: [primary.userId, outsider.userId, ui.userId, m3.userId] },
+        id: {
+          in: [
+            primary.userId,
+            outsider.userId,
+            ui.userId,
+            m3.userId,
+            refresh.userId,
+          ],
+        },
       },
     });
     await database.$disconnect();

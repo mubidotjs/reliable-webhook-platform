@@ -26,7 +26,7 @@ export default async function DeliveriesPage({
     return (
       <>
         {heading}
-        <p role="alert" className="mb-5 text-red-300">
+        <p role="alert" className="feedback-error mb-4">
           Invalid filters. Check the date range, status, IDs, and page size.
         </p>
         <Link className="text-cyan-300 underline" href="/dashboard/deliveries">
@@ -44,7 +44,9 @@ export default async function DeliveriesPage({
     return (
       <>
         {heading}
-        <p role="alert">This page cursor is invalid.</p>
+        <p role="alert" className="feedback-error mb-4">
+          This page cursor is invalid.
+        </p>
         <Link href="/dashboard/deliveries" className="text-cyan-300 underline">
           Newest records
         </Link>
@@ -71,7 +73,7 @@ export default async function DeliveriesPage({
       <DeliveryList rows={result.data} query={current} />
       <nav
         aria-label="Delivery pagination"
-        className="mt-5 flex gap-5 text-sm text-cyan-300"
+        className="mt-4 flex flex-wrap gap-5 text-sm text-accent"
       >
         {query.cursor && (
           <Link href={"/dashboard/deliveries?" + newest}>Newest records</Link>

@@ -1,230 +1,119 @@
 import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/lib/session";
-import {
-  Activity,
-  ArrowUpRight,
-  Check,
-  Clock3,
-  RadioTower,
-  RotateCcw,
-  ShieldCheck,
-  Webhook,
-} from "lucide-react";
+import { ArrowRight, Webhook } from "lucide-react";
 import Link from "next/link";
-
 import { Button } from "@/components/ui/button";
-
-const recentDeliveries = [
-  {
-    event: "invoice.created",
-    endpoint: "billing-receiver",
-    status: "Succeeded",
-    attempts: "1 attempt",
-    age: "12s ago",
-    tone: "success",
-  },
-  {
-    event: "user.updated",
-    endpoint: "crm-sync",
-    status: "Retry scheduled",
-    attempts: "2 attempts",
-    age: "41s ago",
-    tone: "warning",
-  },
-  {
-    event: "subscription.cancelled",
-    endpoint: "analytics",
-    status: "Exhausted",
-    attempts: "5 attempts",
-    age: "8m ago",
-    tone: "danger",
-  },
-];
-
 export default async function HomePage(): Promise<React.ReactNode> {
   if (await getCurrentSession()) redirect("/dashboard");
   return (
-    <main className="min-h-screen px-4 py-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1480px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/80 shadow-panel backdrop-blur">
-        <header className="flex min-h-16 items-center justify-between border-b border-slate-800 px-5 sm:px-7">
+    <div className="min-h-screen">
+      <header className="border-b border-line">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link
             href="/"
-            className="flex items-center gap-3 font-semibold tracking-tight"
+            className="flex min-w-0 items-center gap-3 font-semibold"
           >
-            <span className="grid size-9 place-items-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-300">
-              <Webhook aria-hidden="true" className="size-5" />
-            </span>
+            <Webhook
+              className="size-6 shrink-0 text-accent"
+              aria-hidden="true"
+            />
             <span>Reliable Webhook Platform</span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" className="hidden sm:inline-flex">
-              <Link href="/api/health/live">System status</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/sign-in">
-                Sign in
-                <ArrowUpRight aria-hidden="true" className="size-4" />
-              </Link>
-            </Button>
-          </div>
-        </header>
-
-        <div className="grid lg:grid-cols-[250px_minmax(0,1fr)]">
-          <aside className="hidden border-r border-slate-800 p-5 lg:block">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Workspace
-            </p>
-            <nav aria-label="Primary" className="space-y-1">
-              {(
-                [
-                  ["Overview", Activity, "/dashboard"],
-                  ["Endpoints", RadioTower, "/dashboard/endpoints"],
-                  ["Events", Webhook, "/dashboard/events"],
-                  ["Deliveries", RotateCcw, "/dashboard/deliveries"],
-                ] as const
-              ).map(([label, Icon, href], index) => (
-                <Link
-                  href={href}
-                  key={label}
-                  className={
-                    index === 0
-                      ? "flex min-h-11 items-center gap-3 rounded-lg bg-slate-800/80 px-3 text-sm font-medium text-white"
-                      : "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-400"
-                  }
-                >
-                  <Icon aria-hidden="true" className="size-4" />
-                  {label}
-                </Link>
-              ))}
-            </nav>
-            <div className="mt-10 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
-                <ShieldCheck
-                  aria-hidden="true"
-                  className="size-4 text-cyan-300"
-                />
-                Delivery semantics
-              </div>
-              <p className="text-sm leading-6 text-slate-400">
-                At-least-once delivery with signed payloads and auditable
-                recovery.
-              </p>
-            </div>
-          </aside>
-
-          <section className="p-5 sm:p-7 lg:p-9">
-            <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-              <div>
-                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-cyan-300">
-                  <span className="size-2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.9)]" />
-                  Explore the workspace
-                </div>
-                <h1 className="max-w-3xl text-3xl font-semibold tracking-[-0.035em] text-white sm:text-4xl">
-                  Delivery failures should be explainable—and recoverable.
-                </h1>
-                <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">
-                  Register an endpoint, send a test event, and follow every
-                  signed attempt from acceptance through retry or success.
-                </p>
-              </div>
-              <Button asChild variant="secondary">
-                <Link href="/sign-in">Open workspace</Link>
-              </Button>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              {(
-                [
-                  ["Delivery success", "98.7%", "Illustrative sample", Check],
-                  ["Median latency", "182 ms", "Illustrative sample", Clock3],
-                  ["Outbox backlog", "0", "Illustrative sample", RadioTower],
-                ] as const
-              ).map(([label, value, detail, Icon]) => (
-                <article
-                  key={label}
-                  className="rounded-xl border border-slate-800 bg-slate-900/55 p-5"
-                >
-                  <div className="mb-6 flex items-center justify-between">
-                    <p className="text-sm font-medium text-slate-400">
-                      {label}
-                    </p>
-                    <Icon
-                      aria-hidden="true"
-                      className="size-4 text-slate-500"
-                    />
-                  </div>
-                  <p className="text-3xl font-semibold tracking-tight text-white">
-                    {value}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-500">{detail}</p>
-                </article>
-              ))}
-            </div>
-
-            <article className="mt-5 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/55">
-              <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
-                <div>
-                  <h2 className="font-semibold text-slate-100">
-                    Recent delivery activity
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Representative data until your first workspace is connected.
-                  </p>
-                </div>
-                <span className="hidden text-sm text-slate-500 sm:block">
-                  UTC
-                </span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[680px] text-left">
-                  <thead className="border-b border-slate-800 text-xs uppercase tracking-wider text-slate-500">
-                    <tr>
-                      <th className="px-5 py-3 font-medium">Event</th>
-                      <th className="px-5 py-3 font-medium">Endpoint</th>
-                      <th className="px-5 py-3 font-medium">Status</th>
-                      <th className="px-5 py-3 font-medium">Attempts</th>
-                      <th className="px-5 py-3 text-right font-medium">
-                        Received
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {recentDeliveries.map((delivery) => (
-                      <tr key={delivery.event}>
-                        <td className="px-5 py-4 font-mono text-sm text-slate-200">
-                          {delivery.event}
-                        </td>
-                        <td className="px-5 py-4 text-sm text-slate-400">
-                          {delivery.endpoint}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={
-                              delivery.tone === "success"
-                                ? "status-badge status-success"
-                                : delivery.tone === "warning"
-                                  ? "status-badge status-warning"
-                                  : "status-badge status-danger"
-                            }
-                          >
-                            {delivery.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-sm text-slate-400">
-                          {delivery.attempts}
-                        </td>
-                        <td className="px-5 py-4 text-right text-sm text-slate-500">
-                          {delivery.age}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
-          </section>
+          <Button asChild variant="secondary">
+            <Link href="/sign-in">Sign in</Link>
+          </Button>
         </div>
-      </div>
-    </main>
+      </header>
+      <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-20">
+        <p className="mb-4 text-sm font-medium text-accent">
+          Durable delivery. Inspectable outcomes.
+        </p>
+        <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+          Delivery failures should be explainable—and recoverable.
+        </h1>
+        <p className="mt-6 max-w-2xl text-base leading-7 text-muted">
+          Register your HTTPS receiver, send a signed webhook, and follow every
+          attempt from acceptance through retry or final outcome.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center gap-4">
+          <Button asChild>
+            <Link href="/sign-in">
+              Open workspace
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </Button>
+          <span className="text-sm text-muted">
+            Sign in with GitHub. Create one private workspace.
+          </span>
+        </div>
+        <section
+          className="mt-16 border-y border-line py-8"
+          aria-labelledby="workflow"
+        >
+          <h2 id="workflow" className="text-lg font-semibold">
+            From event to outcome
+          </h2>
+          <ol className="mt-6 grid gap-6 md:grid-cols-3">
+            {[
+              [
+                "01",
+                "Configure a receiver",
+                "Register a public HTTPS endpoint and save its one-time signing secret.",
+              ],
+              [
+                "02",
+                "Send an event",
+                "Acceptance commits the event and delivery work durably before dispatch.",
+              ],
+              [
+                "03",
+                "Inspect and recover",
+                "Follow immutable attempts, scheduled retries, and confirmed manual replays.",
+              ],
+            ].map(([number, title, text]) => (
+              <li key={number}>
+                <span className="font-mono text-xs text-muted">{number}</span>
+                <h3 className="mt-2 font-medium">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted">{text}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <section className="mt-8 grid gap-6 md:grid-cols-2">
+          <div>
+            <h2 className="font-semibold">
+              Built for honest delivery semantics
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              At-least-once delivery with signed payloads, bounded retries, and
+              auditable recovery. Receivers must verify signatures and
+              deduplicate events. An accepted event is not yet a successful
+              delivery.
+            </p>
+          </div>
+          <div>
+            <h2 className="font-semibold">
+              A workspace for operational clarity
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Inspect HTTP results, timing, failure classifications, and the
+              relationship between an original delivery and its replay. Use
+              synthetic data in this public demo.
+            </p>
+          </div>
+        </section>
+      </main>
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4 px-4 py-6 text-xs text-muted sm:px-6">
+          <span>Reliable Webhook Platform</span>
+          <Link
+            href="/api/health/live"
+            className="text-accent underline underline-offset-4"
+          >
+            Process liveness endpoint
+          </Link>
+        </div>
+      </footer>
+    </div>
   );
 }

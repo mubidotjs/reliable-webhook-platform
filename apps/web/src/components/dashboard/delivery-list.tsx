@@ -1,7 +1,7 @@
 import type { deliveryQueries } from "@/modules/deliveries/queries";
 import { MAX_ATTEMPTS } from "@rwp/domain";
 import { EmptyState, RecordLink, StatusBadge, Time } from "./common";
-import { duration, endpointLabel } from "./delivery-format";
+import { duration, endpointLabel, failureDescription } from "./delivery-format";
 type Rows = Awaited<ReturnType<typeof deliveryQueries.list>>["data"];
 export function DeliveryList({
   rows,
@@ -10,11 +10,31 @@ export function DeliveryList({
   rows: Rows;
   query?: string;
 }) {
+  const params = new URLSearchParams(query);
+  const filtered = [
+    "status",
+    "search",
+    "endpointId",
+    "eventType",
+    "from",
+    "to",
+  ].some((key) => params.has(key));
   if (!rows.length)
     return (
       <EmptyState>
-        {query ? (
-          "No deliveries match these filters. Clear or adjust the filters to try again."
+        {filtered ? (
+          <>
+            No deliveries match these filters.{" "}
+            <RecordLink href="/dashboard/deliveries">
+              Reset this view
+            </RecordLink>{" "}
+            or adjust them to try again.
+          </>
+        ) : params.has("cursor") ? (
+          <>
+            No older deliveries on this page.{" "}
+            <RecordLink href="/dashboard/deliveries">Newest records</RecordLink>
+          </>
         ) : (
           <>
             No webhook deliveries yet.{" "}
@@ -27,74 +47,107 @@ export function DeliveryList({
       </EmptyState>
     );
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-800">
-      <table className="w-full min-w-[1150px] text-left text-sm">
+    <div
+      className="table-region"
+      role="region"
+      aria-label="Delivery records"
+      tabIndex={0}
+    >
+      <table className="data-table min-w-[920px] table-fixed">
         <caption className="sr-only">Webhook delivery history</caption>
-        <thead className="bg-slate-900 text-xs uppercase tracking-wider text-slate-400">
+        <colgroup>
+          <col className="w-[158px]" />
+          <col />
+          <col />
+          <col className="w-[135px]" />
+          <col className="w-[84px]" />
+          <col className="w-[120px]" />
+        </colgroup>
+        <thead>
           <tr>
             {[
               "Status",
-              "Delivery / Event",
+              "Event / delivery",
               "Endpoint",
+              "Latest result",
               "Attempts",
-              "Last HTTP",
               "Created (UTC)",
-              "Last attempt (UTC)",
-              "Duration",
             ].map((label) => (
-              <th scope="col" key={label} className="px-4 py-4">
+              <th
+                scope="col"
+                key={label}
+                className={label === "Attempts" ? "text-right" : ""}
+              >
                 {label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800">
+        <tbody>
           {rows.map((row) => {
-            const attempt = row.attempts[0];
+            const outcome = row.attempts[0]?.outcome;
+            const result =
+              outcome?.httpStatus != null
+                ? "HTTP " + outcome.httpStatus
+                : outcome?.errorClass === "TIMEOUT"
+                  ? "Timeout"
+                  : outcome?.status === "UNCERTAIN"
+                    ? "Uncertain"
+                    : outcome
+                      ? "No response"
+                      : row.attemptCount
+                        ? "In progress"
+                        : "Not attempted";
             return (
               <tr key={row.id}>
-                <td className="px-4 py-4">
+                <td>
                   <StatusBadge status={row.status} />
                 </td>
-                <td className="max-w-xs px-4 py-4">
-                  <RecordLink
-                    href={`/dashboard/deliveries/${row.id}${query ? "?list=" + encodeURIComponent(query) : ""}`}
+                <td>
+                  <div className="truncate font-medium">
+                    <RecordLink
+                      href={`/dashboard/deliveries/${row.id}${query ? "?list=" + encodeURIComponent(query) : ""}`}
+                    >
+                      {row.event.type}
+                    </RecordLink>
+                  </div>
+                  <p
+                    className="mt-1 truncate font-mono text-xs text-muted"
+                    title={row.id}
                   >
-                    {row.event.type}
-                  </RecordLink>
-                  <p className="mt-2 break-all font-mono text-xs">
-                    Delivery: {row.id}
-                  </p>
-                  <p className="mt-1 break-all font-mono text-xs text-slate-400">
-                    Event: {row.event.producerEventId}
-                  </p>
-                  <p className="mt-1 break-all font-mono text-xs text-slate-500">
-                    Record: {row.eventId}
+                    {row.id.slice(0, 8)}…{row.id.slice(-6)}
                   </p>
                 </td>
-                <td className="max-w-xs px-4 py-4">
-                  <p>{endpointLabel(row.endpoint)}</p>
+                <td>
+                  <p className="truncate" title={endpointLabel(row.endpoint)}>
+                    {endpointLabel(row.endpoint)}
+                  </p>
                   <p
-                    className="mt-1 truncate text-xs text-slate-400"
+                    className="mt-1 truncate font-mono text-xs text-muted"
                     title={row.destinationUrl}
                   >
                     {row.destinationUrl}
                   </p>
                 </td>
-                <td className="px-4 py-4">
+                <td>
+                  <p
+                    className="text-xs font-medium"
+                    title={failureDescription(
+                      outcome?.errorClass,
+                      outcome?.httpStatus,
+                    )}
+                  >
+                    {result}
+                  </p>
+                  <p className="mt-1 text-xs tabular-nums text-muted">
+                    {duration(outcome?.durationMs)}
+                  </p>
+                </td>
+                <td className="text-right tabular-nums">
                   {row.attemptCount} / {MAX_ATTEMPTS}
                 </td>
-                <td className="px-4 py-4">
-                  {attempt?.outcome?.httpStatus ?? "—"}
-                </td>
-                <td className="px-4 py-4 text-xs">
-                  <Time value={row.createdAt} />
-                </td>
-                <td className="px-4 py-4 text-xs">
-                  <Time value={attempt?.startedAt ?? null} />
-                </td>
-                <td className="px-4 py-4">
-                  {duration(attempt?.outcome?.durationMs)}
+                <td className="text-xs">
+                  <Time value={row.createdAt} compact />
                 </td>
               </tr>
             );
