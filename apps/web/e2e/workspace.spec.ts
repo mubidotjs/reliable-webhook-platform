@@ -59,6 +59,15 @@ test.describe.serial("signed-in workspace", () => {
     await expect(
       page.getByRole("heading", { name: "Save your signing secret" }),
     ).toBeVisible();
+    await page.locator("summary").filter({ hasText: "Add endpoint" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Save your signing secret" }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: "test-results/refresh-secret.png",
+      fullPage: true,
+      mask: [page.locator("[data-secret] code")],
+    });
     const secret = await page.locator("code").innerText();
     expect(secret).toMatch(/^whsec_/);
     await page.getByRole("button", { name: "I saved the secret" }).click();
@@ -72,7 +81,9 @@ test.describe.serial("signed-in workspace", () => {
       .getByLabel("Receiver URL")
       .fill("https://example.com/workspace-updated");
     await page.getByRole("button", { name: "Save endpoint" }).click();
-    await expect(page.getByRole("status")).toContainText("updated");
+    await expect(
+      page.getByRole("status").filter({ hasText: "updated" }),
+    ).toContainText("updated");
   });
   test("preserves the event ID and payload after an uncertain submission", async ({
     page,
@@ -238,14 +249,23 @@ test.describe.serial("signed-in workspace", () => {
     ).toBeVisible();
     await foreignContext.close();
     await page.goto(`/dashboard/endpoints/${endpointId}`);
-    page.on("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Rotate secret" }).click();
+    await expect(
+      page.getByRole("dialog").getByRole("button", { name: "Cancel" }),
+    ).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("button", { name: "Rotate secret" }),
+    ).toBeFocused();
+    await page.getByRole("button", { name: "Rotate secret" }).click();
+    await page.getByRole("button", { name: "Confirm rotation" }).click();
     await expect(
       page.getByRole("heading", { name: "Save your signing secret" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "I saved the secret" }).click();
     await page.getByRole("button", { name: "Disable endpoint" }).click();
-    await expect(page.getByText("DISABLED", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Confirm disable" }).click();
+    await expect(page.getByText("Disabled", { exact: true })).toBeVisible();
     await page.goto("/dashboard/guide");
     await expect(
       page.getByRole("heading", { name: "Add and verify a webhook" }),

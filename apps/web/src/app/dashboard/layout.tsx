@@ -11,29 +11,37 @@ export default async function DashboardLayout({
 }) {
   const workspace = await requireDashboardWorkspace();
   return (
-    <main className="min-h-screen px-3 py-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1480px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/90 shadow-panel">
-        <header className="flex items-center justify-between gap-4 border-b border-slate-800 px-5 py-5 sm:px-7">
-          <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-300">
-              <Webhook className="size-5" aria-hidden="true" />
-            </span>
-            <div>
-              <p className="text-xs text-slate-500">Webhook workspace</p>
-              <p className="break-all font-semibold text-white">
-                {workspace.name}
-              </p>
-            </div>
-          </Link>
-          <SignOutButton />
-        </header>
-        <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="border-b border-slate-800 lg:border-b-0 lg:border-r">
-            <WorkspaceNavigation />
-          </aside>
-          <section className="min-w-0 p-5 sm:p-7 lg:p-9">{children}</section>
-        </div>
+    <div className="min-h-screen">
+      <a
+        href="#main-content"
+        className="sr-only z-50 rounded-md bg-accent p-3 text-canvas focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+      >
+        Skip to content
+      </a>
+      <header className="flex min-h-16 items-center justify-between gap-4 border-b border-line bg-surface px-4 py-3 sm:px-6 lg:px-8">
+        <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
+          <Webhook className="size-6 shrink-0 text-accent" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="text-xs text-muted">Webhook workspace</p>
+            <p className="font-semibold [overflow-wrap:anywhere]">
+              {workspace.name}
+            </p>
+          </div>
+        </Link>
+        <SignOutButton />
+      </header>
+      <div className="lg:grid lg:min-h-[calc(100vh_-_65px)] lg:grid-cols-[216px_minmax(0,1fr)]">
+        <aside className="border-b border-line bg-surface/40 lg:border-b-0 lg:border-r">
+          <WorkspaceNavigation />
+        </aside>
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="min-w-0 p-4 focus:outline-none sm:p-6 lg:p-8"
+        >
+          <div className="mx-auto max-w-[1440px]">{children}</div>
+        </main>
       </div>
-    </main>
+    </div>
   );
 }

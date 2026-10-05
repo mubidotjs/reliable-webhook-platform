@@ -103,6 +103,7 @@ test.describe.serial("M3 operations walkthrough", () => {
     await page.getByRole("link", { name: "Clear filters" }).click();
     await expect(page).toHaveURL(/\/dashboard\/deliveries$/);
     await expect(page.getByRole("row")).toHaveCount(4);
+    await page.getByText("More filters", { exact: true }).click();
     await page
       .getByLabel("Endpoint", { exact: true })
       .fill(demos[0]!.endpointId);
@@ -154,9 +155,9 @@ test.describe.serial("M3 operations walkthrough", () => {
       }),
     ).toBeVisible();
     await expect(page.getByText("Maximum retry policy reached")).toBeVisible();
-    await expect(page.getByLabel("Event JSON payload")).toContainText(
-      "<script>",
-    );
+    await expect(
+      page.getByLabel("Event JSON payload", { exact: true }),
+    ).toContainText("<script>");
     expect(
       await page.evaluate(() =>
         Object.prototype.hasOwnProperty.call(window, "payloadExecuted"),

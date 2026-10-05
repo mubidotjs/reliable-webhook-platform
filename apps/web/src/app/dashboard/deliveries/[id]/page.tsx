@@ -8,11 +8,12 @@ import {
   RecordLink,
   StatusBadge,
   Time,
-  panel,
 } from "@/components/dashboard/common";
 import { RefreshDelivery } from "@/components/dashboard/refresh";
 import { ReplayDialog } from "@/components/dashboard/replay-dialog";
 import { CopyId } from "@/components/dashboard/copy-id";
+import { CodeViewer } from "@/components/dashboard/code-viewer";
+import { AttemptTimeline } from "@/components/dashboard/attempt-timeline";
 import {
   duration,
   endpointLabel,
@@ -43,207 +44,186 @@ export default async function DeliveryPage({
     delivery.status,
   );
   const latest = delivery.attempts.at(-1);
+  const outcome = latest?.outcome;
   return (
     <>
-      <div className="mb-5">
+      <div className="mb-4">
         <RecordLink href={back}>← Back to deliveries</RecordLink>
       </div>
-      <PageHeading title="Delivery details" description={delivery.event.type} />
-      <div className="mb-5 flex flex-wrap items-center gap-4">
-        <StatusBadge status={delivery.status} />
-        <span>
-          {delivery.attemptCount} of {MAX_ATTEMPTS} attempts
-        </span>
-        <ReplayDialog deliveryId={delivery.id} target={delivery.replay} />
+      <PageHeading
+        title="Delivery details"
+        description={delivery.event.type}
+        actions={
+          <ReplayDialog deliveryId={delivery.id} target={delivery.replay} />
+        }
+      />
+      <div className="mb-4">
+        <CopyId value={delivery.id} label="delivery ID" />
+        {delivery.replayOfId && (
+          <p className="mt-2 text-sm text-muted">
+            Replayed from delivery{" "}
+            <RecordLink href={"/dashboard/deliveries/" + delivery.replayOfId}>
+              {delivery.replayOfId}
+            </RecordLink>
+          </p>
+        )}
       </div>
-      <CopyId value={delivery.id} label="delivery ID" />
-      {delivery.replayOfId && (
-        <p className="mt-4 text-sm">
-          Replayed from delivery{" "}
-          <RecordLink href={"/dashboard/deliveries/" + delivery.replayOfId}>
-            {delivery.replayOfId}
-          </RecordLink>
-        </p>
-      )}
-      <RefreshDelivery active={active} />
-      <section className={panel}>
-        <h2 className="mb-4 text-lg font-semibold">Delivery summary</h2>
-        <dl className="grid gap-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <dt className="text-slate-400">Created</dt>
-            <dd>
-              <Time value={delivery.createdAt} />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-slate-400">Last attempt</dt>
-            <dd>
-              <Time value={latest?.startedAt ?? null} />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-slate-400">Last HTTP status</dt>
-            <dd>{latest?.outcome?.httpStatus ?? "No response recorded"}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-400">Last duration</dt>
-            <dd>{duration(latest?.outcome?.durationMs)}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-400">Terminal time</dt>
-            <dd>
-              <Time value={delivery.terminalAt} />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-slate-400">Retry deadline</dt>
-            <dd>
-              <Time value={delivery.retryDeadline} />
-            </dd>
-          </div>
-        </dl>
-        {delivery.status === "RETRY_SCHEDULED" && (
-          <div className="mt-5 rounded-lg bg-amber-300/5 p-4 text-sm">
+      <section
+        aria-label="Delivery outcome"
+        className="rounded-lg border border-line bg-surface p-4 sm:p-5"
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusBadge status={delivery.status} />
+          <span className="text-sm tabular-nums text-muted">
+            {delivery.attemptCount} of {MAX_ATTEMPTS} attempts
+          </span>
+          {outcome && (
+            <span className="text-sm tabular-nums">
+              {outcome.httpStatus != null
+                ? "HTTP " + outcome.httpStatus
+                : "No response recorded"}{" "}
+              · {duration(outcome.durationMs)}
+            </span>
+          )}
+        </div>
+        <div className="mt-3 text-sm leading-6">
+          {delivery.status === "PENDING" && (
+            <p>Accepted and queued, awaiting dispatch.</p>
+          )}
+          {delivery.status === "PROCESSING" && (
             <p>
-              Next attempt: <Time value={delivery.nextAttemptAt} />
+              An outbound attempt is in progress. Waiting for its recorded
+              outcome.
             </p>
-            <p className="mt-2">
-              Attempt {Math.min(delivery.attemptCount + 1, MAX_ATTEMPTS)} of{" "}
-              {MAX_ATTEMPTS}
-            </p>
-            <p className="mt-2">
-              Previous failure:{" "}
+          )}
+          {delivery.status === "RETRY_SCHEDULED" && (
+            <>
+              <p className="font-medium text-amber-200">
+                Next attempt: <Time value={delivery.nextAttemptAt} />
+              </p>
+              <p className="text-muted">
+                Attempt {Math.min(delivery.attemptCount + 1, MAX_ATTEMPTS)} of{" "}
+                {MAX_ATTEMPTS}. Previous failure:{" "}
+                {failureDescription(outcome?.errorClass, outcome?.httpStatus)}
+              </p>
+            </>
+          )}
+          {delivery.status === "EXHAUSTED" && (
+            <p className="text-rose-200">
               {failureDescription(
-                latest?.outcome?.errorClass,
-                latest?.outcome?.httpStatus,
+                delivery.exhaustedReason ?? delivery.lastError,
               )}
             </p>
-          </div>
-        )}
-        {delivery.status === "EXHAUSTED" && (
-          <p className="mt-5 text-sm text-red-300">
-            {failureDescription(delivery.exhaustedReason ?? delivery.lastError)}
-          </p>
-        )}
-        {delivery.status === "CANCELLED" && (
-          <p className="mt-5 text-sm">
-            {failureDescription(delivery.lastError)}
-          </p>
-        )}
-        {delivery.status === "SUCCEEDED" && (
-          <p className="mt-5 text-sm text-emerald-300">
-            HTTP delivery succeeded. Your receiver must verify the signature
-            before returning success; this platform cannot independently confirm
-            that verification.
-          </p>
-        )}
-        {delivery.status === "PENDING" && (
-          <p className="mt-5 text-sm text-slate-400">
-            Accepted and queued, awaiting dispatch.
-          </p>
-        )}
-      </section>
-      <section className={panel + " mt-6"}>
-        <h2 className="mb-4 text-lg font-semibold">Endpoint</h2>
-        <p>{endpointLabel(delivery.endpoint)}</p>
-        <p className="my-3">
-          <StatusBadge status={delivery.endpoint.status} />
-        </p>
-        <CopyId value={delivery.endpointId} label="endpoint ID" />
-        <p className="mt-3 text-sm text-slate-400">Delivery destination</p>
-        <p className="break-all text-sm">{delivery.destinationUrl}</p>
-        {delivery.endpoint.url !== delivery.destinationUrl && (
-          <>
-            <p className="mt-3 text-sm text-slate-400">
-              Current destination for replay
-            </p>
-            <p className="break-all text-sm">{delivery.endpoint.url}</p>
-          </>
-        )}
-      </section>
-      <section className={panel + " mt-6"}>
-        <h2 className="mb-4 text-lg font-semibold">Event payload</h2>
-        <p className="mb-2 text-sm">{delivery.event.type}</p>
-        <CopyId value={delivery.event.producerEventId} label="event ID" />
-        <div className="my-3 text-xs text-slate-400">
-          Event record:{" "}
-          <CopyId value={delivery.eventId} label="event record ID" />
+          )}
+          {delivery.status === "CANCELLED" && (
+            <p>{failureDescription(delivery.lastError)}</p>
+          )}
+          {delivery.status === "SUCCEEDED" && (
+            <>
+              <p className="text-emerald-200">HTTP delivery succeeded.</p>
+              <p className="mt-1 text-muted">
+                Your receiver must verify the signature before returning
+                success; this platform cannot independently confirm that
+                verification.
+              </p>
+            </>
+          )}
         </div>
-        <p className="mb-4 text-sm">
-          <Time value={delivery.event.createdAt} />
-        </p>
-        <pre
-          tabIndex={0}
-          aria-label="Event JSON payload"
-          className="max-h-96 overflow-auto rounded-lg bg-slate-950 p-4 text-xs leading-6"
-        >
-          <code>{JSON.stringify(delivery.event.payload, null, 2)}</code>
-        </pre>
       </section>
-      <h2 className="mb-4 mt-8 text-lg font-semibold">Attempt history</h2>
-      {!delivery.attempts.length && (
-        <p className={panel}>No outbound attempt has started yet.</p>
-      )}
-      <ol className="space-y-4">
-        {delivery.attempts.map((a) => (
-          <li key={a.id} className={panel}>
-            <div className="flex flex-wrap items-center gap-4">
-              <h3 className="font-semibold">Attempt #{a.sequence}</h3>
-              <StatusBadge status={a.outcome?.status ?? "STARTED"} />
-            </div>
-            <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-slate-400">Started</dt>
-                <dd>
-                  <Time value={a.startedAt} />
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-400">Completed</dt>
-                <dd>
-                  <Time value={a.outcome?.completedAt ?? null} />
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-400">HTTP status</dt>
-                <dd>{a.outcome?.httpStatus ?? "No response recorded"}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-400">Duration</dt>
-                <dd>{duration(a.outcome?.durationMs)}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-400">Outcome</dt>
-                <dd>
-                  {a.outcome
-                    ? failureDescription(
-                        a.outcome.errorClass,
-                        a.outcome.httpStatus,
-                      )
-                    : "Awaiting outcome"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-400">Resulting delivery state</dt>
-                <dd>
-                  {a.outcome ? (
-                    <StatusBadge status={a.outcome.resultingState} />
-                  ) : (
-                    "Awaiting outcome"
-                  )}
-                </dd>
-              </div>
-            </dl>
-            <p className="mt-4 break-all font-mono text-xs text-slate-500">
-              Attempt ID: {a.id}
+      <RefreshDelivery active={active} />
+      <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <AttemptTimeline delivery={delivery} />
+        <aside
+          aria-label="Delivery metadata"
+          className="min-w-0 space-y-6 border-t border-line pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"
+        >
+          <section>
+            <h2 className="text-lg font-semibold">Endpoint</h2>
+            <p className="mt-3">
+              <RecordLink href={"/dashboard/endpoints/" + delivery.endpointId}>
+                {endpointLabel(delivery.endpoint)}
+              </RecordLink>
             </p>
-          </li>
-        ))}
-      </ol>
-      <p className="mt-5 text-sm text-slate-400">
-        Response bodies were not retained. Recorded HTTP status and failure
-        classifications are shown above.
-      </p>
+            <div className="mt-2">
+              <StatusBadge status={delivery.endpoint.status} />
+            </div>
+            <dl className="mt-3 space-y-3 text-xs">
+              <div>
+                <dt className="text-muted">Endpoint ID</dt>
+                <dd>
+                  <CopyId value={delivery.endpointId} label="endpoint ID" />
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Delivery destination</dt>
+                <dd>
+                  <CopyId
+                    value={delivery.destinationUrl}
+                    label="delivery destination URL"
+                  />
+                </dd>
+              </div>
+              {delivery.endpoint.url !== delivery.destinationUrl && (
+                <div>
+                  <dt className="text-muted">Current destination for replay</dt>
+                  <dd>
+                    <CopyId
+                      value={delivery.endpoint.url}
+                      label="current destination URL"
+                    />
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </section>
+          <section className="border-t border-line pt-5">
+            <h2 className="text-lg font-semibold">Lifecycle</h2>
+            <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-1">
+              {[
+                ["Created", delivery.createdAt],
+                ["Last attempt", latest?.startedAt ?? null],
+                ["Terminal time", delivery.terminalAt],
+                ["Retry deadline", delivery.retryDeadline],
+              ].map(([label, value]) => (
+                <div key={String(label)}>
+                  <dt className="text-muted">{String(label)}</dt>
+                  <dd className="mt-1">
+                    <Time value={value as Date | null} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </aside>
+      </div>
+      <section
+        className="mt-8 min-w-0 border-t border-line pt-6"
+        aria-labelledby="payload-heading"
+      >
+        <h2 id="payload-heading" className="text-lg font-semibold">
+          Event payload
+        </h2>
+        <div className="my-4 grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
+          <div>
+            <p className="text-muted">Producer event ID</p>
+            <CopyId value={delivery.event.producerEventId} label="event ID" />
+          </div>
+          <div>
+            <p className="text-muted">Event record</p>
+            <CopyId value={delivery.eventId} label="event record ID" />
+          </div>
+          <p className="sm:col-span-2 text-muted">
+            Accepted <Time value={delivery.event.createdAt} /> ·{" "}
+            <RecordLink href={"/dashboard/events/" + delivery.eventId}>
+              Open event
+            </RecordLink>
+          </p>
+        </div>
+        <CodeViewer
+          value={JSON.stringify(delivery.event.payload, null, 2)}
+          label="Event JSON payload"
+        />
+      </section>
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { requireDashboardWorkspace } from "@/modules/dashboard/session";
-import { PageHeading, RecordLink, panel } from "@/components/dashboard/common";
+import { PageHeading, RecordLink } from "@/components/dashboard/common";
+import { CodeViewer } from "@/components/dashboard/code-viewer";
 const example = `// Node.js: read the request as bytes before parsing JSON.
 const key = Buffer.from(process.env.WEBHOOK_SIGNING_SECRET.slice(6), "base64url");
 const eventId = request.headers["webhook-id"];
@@ -20,8 +21,8 @@ export default async function GuidePage() {
         title="Add and verify a webhook"
         description="A webhook endpoint is your receiving service. This platform sends signed HTTP requests to it; QStash schedules those requests behind the scenes."
       />
-      <div className="space-y-5">
-        <section className={panel}>
+      <div className="max-w-[760px] space-y-6">
+        <section className="border-b border-line pb-6 last:border-b-0">
           <h2 className="text-lg font-semibold">
             1. Prepare your HTTPS receiver
           </h2>
@@ -38,13 +39,16 @@ export default async function GuidePage() {
             and expose port 4001 through your own HTTPS reverse proxy. localhost
             cannot be registered as a production destination.
           </p>
-          <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs">
-            {
-              "# Set WEBHOOK_SIGNING_SECRET in your environment after step 2\npnpm --filter @rwp/receiver dev:verified"
-            }
-          </pre>
+          <div className="mt-4">
+            <CodeViewer
+              label="Run the receiver"
+              value={
+                "# Set WEBHOOK_SIGNING_SECRET in your environment after step 2\npnpm --filter @rwp/receiver dev:verified"
+              }
+            />
+          </div>
         </section>
-        <section className={panel}>
+        <section className="border-b border-line pb-6 last:border-b-0">
           <h2 className="text-lg font-semibold">
             2. Register the URL and save the secret
           </h2>
@@ -56,7 +60,7 @@ export default async function GuidePage() {
             secret from endpoint details.
           </p>
         </section>
-        <section className={panel}>
+        <section className="border-b border-line pb-6 last:border-b-0">
           <h2 className="text-lg font-semibold">
             3. Verify signatures in your receiver
           </h2>
@@ -66,9 +70,12 @@ export default async function GuidePage() {
             headers and the exact unparsed request bytes. Reject stale
             timestamps and compare the complete v1= signature in constant time.
           </p>
-          <pre className="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs leading-6 text-slate-300">
-            {example}
-          </pre>
+          <div className="mt-4">
+            <CodeViewer
+              label="Signature verification outline"
+              value={example}
+            />
+          </div>
           <p className="mt-3 text-sm leading-7 text-slate-400">
             The complete example validates headers, enforces a five-minute
             timestamp tolerance, and stores receipts in SQLite to deduplicate
@@ -78,7 +85,7 @@ export default async function GuidePage() {
             deliveries finish.
           </p>
         </section>
-        <section className={panel}>
+        <section className="border-b border-line pb-6 last:border-b-0">
           <h2 className="text-lg font-semibold">
             4. Send a synthetic test event
           </h2>
@@ -90,7 +97,7 @@ export default async function GuidePage() {
             delivery.
           </p>
         </section>
-        <section className={panel}>
+        <section className="border-b border-line pb-6 last:border-b-0">
           <h2 className="text-lg font-semibold">
             5. Confirm delivery and receiver verification
           </h2>
@@ -102,7 +109,7 @@ export default async function GuidePage() {
             check.
           </p>
         </section>
-        <section className={panel}>
+        <section className="border-b border-line pb-6 last:border-b-0">
           <h2 className="text-lg font-semibold">If something fails</h2>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-400">
             <li>

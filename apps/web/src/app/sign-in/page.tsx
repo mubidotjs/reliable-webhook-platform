@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default function SignInPage(): React.ReactNode {
   return (
     <main className="grid min-h-screen place-items-center px-4 py-10">
-      <section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950/90 p-7 shadow-panel sm:p-9">
+      <section className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-950/90 p-7 sm:p-9">
         <Link
           href="/"
           className="mb-10 inline-flex items-center gap-3 font-semibold"
@@ -18,10 +18,10 @@ export default function SignInPage(): React.ReactNode {
           </span>
           Reliable Webhook Platform
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight text-white">
+        <h1 className="text-[28px] leading-9 font-semibold tracking-tight text-white">
           Sign in to your delivery workspace
         </h1>
-        <p className="mt-3 text-base leading-7 text-slate-400">
+        <p className="mt-3 text-sm leading-6 text-slate-400">
           GitHub identifies your account. New accounts create one private
           workspace before registering an endpoint.
         </p>

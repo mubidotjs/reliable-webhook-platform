@@ -10,6 +10,7 @@ import {
   Time,
 } from "@/components/dashboard/common";
 import { EndpointForm } from "@/components/dashboard/endpoint-form";
+import { FormDisclosure } from "@/components/dashboard/form-disclosure";
 export default async function EndpointsPage({
   searchParams,
 }: {
@@ -22,34 +23,69 @@ export default async function EndpointsPage({
     <>
       <PageHeading
         title="Endpoints"
-        description="An endpoint is the HTTPS receiver that will receive your signed webhook requests. Up to five endpoints can be enabled."
+        description="Your HTTPS receivers for signed webhook requests. Up to five endpoints can be enabled."
       />
-      <EndpointForm />
-      <h2 className="mb-4 mt-8 text-lg font-semibold">Registered endpoints</h2>
+      <FormDisclosure
+        title="Add endpoint"
+        initiallyOpen={!cursor && !result.data.length}
+      >
+        <EndpointForm />
+      </FormDisclosure>
+      <h2 className="mb-4 text-lg font-semibold">Registered endpoints</h2>
       {!result.data.length ? (
         <EmptyState>
-          No endpoints yet. Add your receiver URL above to get started.
+          {cursor
+            ? "No older endpoints on this page."
+            : "No endpoints yet. Add your receiver URL above to get started."}
         </EmptyState>
       ) : (
-        <div className="space-y-3">
-          {result.data.map((e) => (
-            <article
-              key={e.id}
-              className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-800 p-5"
-            >
-              <div className="min-w-0">
-                <RecordLink href={`/dashboard/endpoints/${e.id}`}>
-                  {endpointLabel(e)}
-                </RecordLink>
-                <p className="mt-1 break-all text-xs text-slate-400">{e.url}</p>
-                <p className="mt-2 text-xs text-slate-500">
-                  <Time value={e.createdAt} /> · Secret version{" "}
-                  {e.currentSecretVersion}
-                </p>
-              </div>
-              <StatusBadge status={e.status} />
-            </article>
-          ))}
+        <div
+          className="table-region"
+          role="region"
+          aria-label="Endpoint records"
+          tabIndex={0}
+        >
+          <table className="data-table min-w-[660px]">
+            <caption className="sr-only">Registered endpoints</caption>
+            <thead>
+              <tr>
+                {[
+                  "Endpoint / destination",
+                  "Status",
+                  "Secret version",
+                  "Created (UTC)",
+                ].map((label) => (
+                  <th key={label} scope="col">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {result.data.map((e) => (
+                <tr key={e.id}>
+                  <td className="max-w-sm">
+                    <RecordLink href={"/dashboard/endpoints/" + e.id}>
+                      {endpointLabel(e)}
+                    </RecordLink>
+                    <p
+                      className="mt-1 truncate font-mono text-xs text-muted"
+                      title={e.url}
+                    >
+                      {e.url}
+                    </p>
+                  </td>
+                  <td>
+                    <StatusBadge status={e.status} />
+                  </td>
+                  <td className="tabular-nums">{e.currentSecretVersion}</td>
+                  <td className="text-xs">
+                    <Time value={e.createdAt} compact />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
       <Pagination

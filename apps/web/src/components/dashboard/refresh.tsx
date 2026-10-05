@@ -14,7 +14,7 @@ export function RefreshDelivery({ active = false }: { active?: boolean }) {
     return () => clearInterval(timer);
   }, [active, pending, router]);
   return (
-    <div className="my-5 flex flex-wrap items-center gap-4">
+    <div className="my-4 flex flex-wrap items-center justify-between gap-3">
       <Button
         variant="secondary"
         disabled={pending}
@@ -22,7 +22,7 @@ export function RefreshDelivery({ active = false }: { active?: boolean }) {
       >
         {pending ? "Refreshing…" : "Refresh"}
       </Button>
-      <span className="text-xs text-slate-500">
+      <span className="text-xs text-muted">
         {active
           ? "Updates every 3 seconds while this page is visible."
           : "Showing the latest loaded records."}

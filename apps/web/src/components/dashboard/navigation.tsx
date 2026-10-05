@@ -4,9 +4,9 @@ import { usePathname } from "next/navigation";
 import { Activity, RadioTower, Webhook, Send, BookOpen } from "lucide-react";
 const links = [
   ["/dashboard", "Overview", Activity],
+  ["/dashboard/deliveries", "Deliveries", Send],
   ["/dashboard/endpoints", "Endpoints", RadioTower],
   ["/dashboard/events", "Events", Webhook],
-  ["/dashboard/deliveries", "Deliveries", Send],
   ["/dashboard/guide", "Setup guide", BookOpen],
 ] as const;
 export function WorkspaceNavigation() {
@@ -14,7 +14,7 @@ export function WorkspaceNavigation() {
   return (
     <nav
       aria-label="Workspace"
-      className="flex gap-2 overflow-x-auto p-3 lg:flex-col lg:p-5"
+      className="grid grid-cols-2 gap-1 p-3 sm:grid-cols-3 lg:sticky lg:top-0 lg:flex lg:flex-col lg:p-4"
     >
       {links.map(([href, label, Icon]) => {
         const active =
@@ -24,9 +24,9 @@ export function WorkspaceNavigation() {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${active ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}
+            className={`flex min-h-11 items-center gap-2.5 rounded-md border-l-2 px-3 text-sm font-medium ${href.endsWith("/guide") ? "lg:mt-6" : ""} ${active ? "border-accent bg-raised text-foreground" : "border-transparent text-muted hover:bg-raised hover:text-foreground"}`}
           >
-            <Icon aria-hidden="true" className="size-4" />
+            <Icon aria-hidden="true" className="size-4 shrink-0" />
             {label}
           </Link>
         );
