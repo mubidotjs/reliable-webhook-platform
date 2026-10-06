@@ -65,11 +65,35 @@ Metrics cover accepted events, created/succeeded/exhausted/cancelled deliveries,
 - `GET /api/health/live`: dependency-free process liveness.
 - `GET /api/health/ready`: validates settings and executes `SELECT 1`, with 1.5-second connection and query deadlines. Returns 200 ready or generic 503 unavailable, never credentials. No QStash/GitHub probe.
 
-Retain Vercel/Neon/QStash and `pnpm vercel-build`. The README describes database identity/schema preflight and OAuth compatibility. Production validates configuration before committed migrations. M4 adds an outbox aggregate/topic/generation/status index for recovery and consumption. Original-delivery partial uniqueness and immutable history protections stay intact; blanket event/endpoint uniqueness would break replay.
+Retain Vercel/Neon/QStash and `pnpm vercel-build`. The deployment sections below describe database identity/schema preflight and OAuth compatibility. Production validates configuration before committed migrations. M4 adds an outbox aggregate/topic/generation/status index for recovery and consumption. Original-delivery partial uniqueness and immutable history protections stay intact; blanket event/endpoint uniqueness would break replay.
 
 The index uses a normal table lock. Apply during low traffic for this bounded-volume deployment; larger installations need a separately reviewed concurrent-index rollout. Back up first. Never reset production or edit applied migrations. A later application-build failure does not roll back committed migrations.
 
 Set `APP_URL` to the stable public HTTPS origin. Worker and recovery callbacks are `/api/internal/deliveries/process` and `/api/internal/deliveries/recover`. Configure both signing keys and public reachability. After deployment, run `pnpm --filter @rwp/web queue:setup` from a correctly configured operator shell to establish the five-minute schedule. This changes QStash configuration and is not part of local tests.
+
+## Vercel production deployment
+
+Set the Vercel project Root Directory to `apps/web`, enable access to source files outside that directory for the workspace packages, and use the committed `vercel.json` build command: `pnpm vercel-build`. Remove any dashboard Build Command override that bypasses this command. Install from the workspace lockfile with development dependencies available for Prisma and tsx.
+
+Configure production-scoped `DATABASE_URL` (pooled runtime connection) and `DIRECT_URL` (direct migration connection) for the **same database**, using the `public` schema. Configure `BETTER_AUTH_URL=https://webhooks.mubashirhussain.dev`, the auth secret and GitHub credentials, and register `https://webhooks.mubashirhussain.dev/api/auth/callback/github` in the GitHub OAuth app.
+
+The build generates Prisma Client first. Only when `VERCEL_ENV=production`, it checks database identity using a temporary transaction-scoped advisory lock, checks tables against completed migration history, applies committed migrations, and checks again before building Next.js. Different pooled/direct hostnames are supported. Both connections need access to PostgreSQL advisory locks; connection failure or any migration/preflight failure stops deployment. Migrations are additive but are not rolled back if the later application build fails.
+
+Preview and ordinary local builds never apply migrations automatically. Provision preview databases separately and do not give previews production database credentials. Do not promote a preview built without this production migration step directly to production; trigger a production build.
+
+### Missing auth tables / P2021
+
+If GitHub sign-in reports that `public.verifications` does not exist, inspect the production database URLs and migration status with `pnpm --filter @rwp/web exec prisma migrate status` using production-scoped `DIRECT_URL`. Deploy using the production build above to apply the existing foundation migration. Prisma CLI reads `DIRECT_URL`; the running app reads `DATABASE_URL`. Never paste credentials into logs or issue reports.
+
+If completed migration history references missing tables, the build reports schema drift and stops. Recover from the appropriate backup or prepare a reviewed, targeted repair based on the actual database state. Do not run `migrate reset`, edit applied migration files, or mark missing migrations as applied. An SSL-mode warning is separate from a missing-table error.
+
+After release, click Continue with GitHub and confirm the social endpoint no longer returns 500. Complete OAuth and verify the session and dashboard/onboarding flow. A local test cannot validate production GitHub credentials or the live callback configuration.
+
+### Better Auth callback compatibility
+
+Better Auth and its Prisma adapter are pinned together at 1.7.3. Versions 1.7.0–1.7.2 queried an account `issuer` field; 1.7.3 uses the existing `(providerId, accountId)` key again. Keep the committed schema and regenerate Prisma Client during deployment. See the [official upgrade guide](https://better-auth.com/docs/guides/1-7-upgrade-guide).
+
+The production preflight inspects `public.accounts` for a manually added required `issuer` column. If found, it stops the release with a repair instruction. After confirming the live column and reviewing the database state, commit a migration containing `ALTER TABLE public.accounts ALTER COLUMN issuer DROP NOT NULL;` and apply it with the existing `pnpm db:deploy` command before retrying the production build. Preserve the column's data and the existing `(providerId, accountId)` unique constraint. No issuer migration is needed for the repository's current schema.
 
 ## Production smoke checklist
 

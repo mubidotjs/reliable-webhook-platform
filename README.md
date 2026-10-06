@@ -1,173 +1,146 @@
 # Reliable Webhook Platform
 
-A TypeScript modular monolith for durable, signed webhook delivery. It combines secure endpoints, a transactional outbox, bounded retries, crash recovery and an operations UI with immutable history and manual replay. M4 hardens observability, validation and deployment; hosted QStash sign-off remains pending.
+A webhook delivery platform that accepts events durably, sends signed HTTP requests, and gives operators a path from failed delivery to recovery. Queue outages, retries, and worker crashes become explicit persisted states with inspectable history.
 
-## Implementation status
+- **Durable acceptance:** events, deliveries, and outbox work commit before the API returns `202`.
+- **Recoverable processing:** leased claims, stale-worker fencing, bounded retries, and scheduled recovery.
+- **Secure delivery:** HMAC signatures, encrypted secrets, tenant-scoped access, and connection-time destination checks.
+- **Operational visibility:** searchable history, attempt timelines, and replay without overwriting previous attempts.
 
-- Next.js 16 App Router and React 19 web application
-- Better Auth database sessions with GitHub-only OAuth
-- Explicit one-owner/one-workspace onboarding
-- Prisma 7 and PostgreSQL 17 foundation schema
-- Fastify failure-injection receiver
-- Pure domain, contracts, configuration, and testing packages
-- Docker Compose, CI, strict TypeScript, ESLint, Prettier, and Vitest
-- Architecture decisions for the v1 reliability and security model
-- REST endpoint create, list, read, update, disable, and secret rotation
-- Show-once signing secrets encrypted with a versioned AES-256-GCM keyring
-- HTTPS/DNS/connection-time SSRF policy and generated OpenAPI 3.1 contracts
+[Live application](https://webhooks.mubashirhussain.dev) · [Architecture](docs/architecture.md) · [API contract](docs/openapi.json) · [Demo walkthrough](docs/demo.md)
 
-- Session-authenticated event ingestion with producer idempotency
-- Transactional PostgreSQL outbox, local worker, and signed QStash callbacks
-- Append-only attempt history, bounded retries, and crash recovery
+**Status:** v1 is implemented and locally verified. The hosted application is available; full hosted OAuth, QStash, and recovery acceptance remains [pending in the release evidence](docs/reviews/m4-v1-hardening.md#hosted-acceptance--final-sign-off--2026-10-04).
 
-See [M2 verification](docs/reviews/m2-durable-delivery.md) for test results and remaining live-demo requirements. M3 delivery history and manual replay are implemented. M4 adds telemetry, readiness, distributed request limits and a reproducible load harness; see [M4 acceptance evidence](docs/reviews/m4-v1-hardening.md).
+## See it in operation
 
-## Prerequisites
+Sign in with GitHub, create a workspace, register a public HTTPS receiver, and submit an event. Use synthetic data only; history is not automatically deleted. Default daily acceptance limits are 25 deliveries per workspace and 100 globally, including replays.
 
-- Node.js 24 LTS (see `.nvmrc`)
-- pnpm 11.19.0 via Corepack
-- Docker with Compose v2
-- A GitHub OAuth app for interactive sign-in
+![Delivery history with statuses, destinations, results, and attempt counts](docs/images/delivery-history.png)
 
-The Compose database binds to host port `54329` by default to avoid common local PostgreSQL collisions. Set `POSTGRES_PORT` and update both database URLs if another port is needed.
+<details>
+<summary>Inspect retries and replay</summary>
 
-## Local setup
+An attempt timeline explains how a delivery reached its current state:
 
-1. Enable pnpm and install dependencies.
+![Delivery succeeding after two HTTP 500 responses](docs/images/delivery-attempts.png)
 
-   ```bash
-   corepack enable
-   corepack prepare pnpm@11.19.0 --activate
-   pnpm install --frozen-lockfile
-   ```
+Replay confirms the current destination and creates a separate delivery:
 
-2. Copy `.env.example` to `.env` and replace the development placeholders. Export it into the shell using [environment loading](docs/m4-operations.md#environment-loading) before the commands below. Generate `BETTER_AUTH_SECRET` with at least 32 random bytes. Configure the GitHub OAuth callback as:
+![Replay confirmation for an exhausted delivery](docs/images/replay-confirmation.png)
 
-   ```text
-   http://localhost:3000/api/auth/callback/github
-   ```
+</details>
 
-3. Start PostgreSQL and apply the reviewed migrations.
+Screenshots show the actual UI reading persisted synthetic local records. Outcomes and retry time are controlled for demonstration; these are not hosted-delivery measurements.
 
-   ```bash
-   docker compose up -d postgres
-   pnpm db:generate
-   pnpm db:deploy
-   ```
+## Architecture and delivery lifecycle
 
-4. Export `.env` in the command shell using [these instructions](docs/m4-operations.md#environment-loading), then run both applications. In another configured shell run `pnpm --filter @rwp/web worker` for local delivery dispatch.
+One Next.js modular monolith owns the UI, APIs, services, and worker callbacks. PostgreSQL is authoritative; QStash provides hosted scheduling and invocation.
 
-   ```bash
-   pnpm dev
-   ```
-
-The web app runs at `http://localhost:3000`; the receiver runs at `http://localhost:4000`. The receiver health endpoint is `/health`, with deterministic behavior routes under `/receive`.
-
-## Verification
-
-```bash
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:integration
-pnpm openapi:check
-pnpm build
-pnpm test:e2e
+```mermaid
+flowchart LR
+  User[Signed-in user] --> UI
+  subgraph App[Next.js application]
+    UI["Operations UI<br/>Event and replay APIs"]
+    Publisher[Outbox publisher]
+    Processor[Delivery processor]
+    Recovery[Recovery handler]
+  end
+  UI <-->|Acceptance and history| DB[(PostgreSQL)]
+  DB -->|Due outbox work| Publisher
+  Publisher -->|Hosted dispatch| Q[QStash]
+  Q -->|Signed callback| Processor
+  Q -->|Signed five-minute tick| Recovery
+  Recovery -->|Reclaim stale work| DB
+  Recovery --> Publisher
+  Local[Local worker] -.-> Recovery
+  Publisher -. Local adapter .-> Processor
+  Processor -->|Signed HTTPS| Destination[Webhook receiver]
+  Processor -->|Outcome and retry state| DB
 ```
 
-Integration tests require the local PostgreSQL service. Configuration is parsed through `@rwp/config`; secrets and provider credentials must remain in environment variables.
+1. **Accept:** validate the session, workspace, endpoint, and quota. Commit the event, delivery, outbox, audit, and counters together; then return `202`.
+2. **Dispatch:** attempt an outbox drain after the response. Publication failure leaves durable work for recovery. Local dispatch invokes the same processor directly.
+3. **Deliver:** claim a generation under a lease, persist the attempt, and send stored bytes using the pinned destination and secret version.
+4. **Complete or retry:** commit the outcome and delivery state with any next-generation outbox record. Recovery handles expired leases, missing work, and overdue callbacks.
 
-## Repository map
+Application policy owns retry timing; QStash provider retries are disabled. [Delivery and recovery details](docs/m2-delivery.md).
 
-```text
-apps/web        Next.js UI, route adapters, application modules, persistence, worker entrypoint
-apps/receiver   Fastify receiver for success, delay, termination, status, and failure sequences
-packages/domain Pure delivery state and policy rules
-packages/contracts Shared Zod contracts and API problem shapes
-packages/config Typed server configuration
-packages/testing Shared test builders introduced only when duplication exists
-docs/adr        Accepted architecture decisions
-infra/docker    Local container definitions
+## Guarantees and idempotency
+
+A `202` means work is committed, not that the receiver processed it. Delivery is **at least once**: a crash after remote receipt but before saving success can cause another request. Recovery records unresolved attempts as `UNCERTAIN`; claim tokens fence stale workers.
+
+Automatic processing permits **five attempts within 24 hours**, with a five-second HTTP deadline, equal-jitter exponential backoff, and bounded `Retry-After` for 429/503 responses. Permanent failures or exhausted retry budgets end the delivery. Recovery requires the database, application, and scheduler to become available; eventual success and exactly-once processing are not promised.
+
+| Boundary            | Behavior                                                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Producer submission | A workspace-scoped event ID returns the existing delivery for equivalent content; conflicting content returns `409`.                                         |
+| Queue callback      | Generation and persisted-state checks ignore duplicate or obsolete work.                                                                                     |
+| Replay request      | A workspace-scoped `Idempotency-Key` returns the same replay for 24 hours. New replays preserve original event bytes and use current endpoint configuration. |
+| Receiver            | Atomically deduplicate `webhook-id` with the business update. Replay retains that ID, so previously processed events may be ignored.                         |
+
+Replay requires a terminal delivery and enabled endpoint. Confirmation rechecks the endpoint revision before committing. [Replay contract](docs/m3-operations.md#replay).
+
+## Security boundaries
+
+- GitHub OAuth and Better Auth database sessions supply workspace identity. Queries are tenant-scoped; foreign records return `404`. Session mutations require the configured Origin.
+- HMAC-SHA256 signs `eventId.timestamp.rawBody`. The [consumer example](docs/signing.md#consumer-implementation) checks exact bytes, timestamp freshness, and signatures using constant-time comparison.
+- Signing secrets are shown once on creation/rotation and encrypted with versioned AES-256-GCM, bound to workspace, endpoint, and secret version.
+- Destinations require public HTTPS on port 443. DNS addresses are checked at registration and connection; redirects are not followed. QStash signatures bind callbacks to their exact body and expected URL.
+
+Response bodies are not retained. Bounded parsing, PostgreSQL-backed request limits, quotas, and allowlisted diagnostics limit abuse and accidental disclosure.
+
+## Operations and verification
+
+Structured lifecycle logs carry correlation and resource IDs without payloads or credentials. Durable hourly counters and timing aggregates support an operator report. Liveness is dependency-free; readiness validates configuration and database connectivity, without claiming provider health. Production builds check configuration, database identity, and migration state.
+
+| Recorded evidence                                                       | Result                                                                                                           |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [Local verification, 2026-10-05](docs/reviews/ui-refresh.md#validation) | 81 unit, 44 integration, and 27 browser tests passed; build, types, lint, formatting, and OpenAPI checks passed. |
+| [Load run, 2026-09-26](docs/reviews/m4-load-evidence.json)              | 1,000 events, 3 endpoints, concurrency 8; 1,000 successes in 1,100 attempts, including 100 initial failures.     |
+| [Measured latency](docs/load-testing.md#results)                        | Service ingestion p95: 494.88 ms; history-page p95: 22.01 ms.                                                    |
+
+Tests exercise rollback, concurrency, publication failures, worker exits, fencing, tenant isolation, signing, replay, and history preservation. The load run used signed loopback HTTP with an injected transport and accelerated retries; it excluded ingress HTTP/authentication and live QStash/public TLS. These are local measurements, not production capacity claims.
+
+[Current CI](https://github.com/mubidotjs/reliable-webhook-platform/actions/workflows/ci.yml) · [Load methodology](docs/load-testing.md) · [Operations and release checks](docs/m4-operations.md)
+
+## Stack and local setup
+
+| Area                     | Technologies                                                |
+| ------------------------ | ----------------------------------------------------------- |
+| Application              | TypeScript, Next.js 16, React 19, Tailwind CSS              |
+| Persistence and identity | PostgreSQL 17, Prisma 7, Better Auth, GitHub OAuth          |
+| Background delivery      | PostgreSQL outbox, Upstash QStash, local worker             |
+| Contracts and testing    | Zod, OpenAPI 3.1, Vitest, Playwright, Fastify test receiver |
+| Deployment               | Vercel, PostgreSQL/Neon, Docker Compose locally             |
+
+Requires Node.js 24, pnpm 11.19.0, Docker Compose v2, and a GitHub OAuth app.
+
+```sh
+pnpm install --frozen-lockfile
 ```
 
-See [Architecture](docs/architecture.md) for boundaries and data flow. No cloud resource, DNS record, GitHub remote, or deployment is created by this repository.
+Copy `.env.example` to `.env`. Set database URLs, GitHub credentials, a random auth secret, and a 32-byte base64url encryption key. Register `http://localhost:3000/api/auth/callback/github` as the OAuth callback. [Export the environment in each shell](docs/m4-operations.md#environment-loading), then:
 
-## Data handling
-
-The public demo is intended for synthetic payloads only. Do not submit employer, customer, credential, personal, or regulated data. Automatic delivery-history deletion is not implemented. Manage retention and capacity explicitly; M4 prunes only stale authentication and mutation request counters.
-
-## License
-
-MIT
-
-## Vercel production deployment
-
-Set the Vercel project Root Directory to `apps/web`, enable access to source files outside that directory for the workspace packages, and use the committed `vercel.json` build command: `pnpm vercel-build`. Remove any dashboard Build Command override that bypasses this command. Install from the workspace lockfile with development dependencies available for Prisma and tsx.
-
-Configure production-scoped `DATABASE_URL` (pooled runtime connection) and `DIRECT_URL` (direct migration connection) for the **same database**, using the `public` schema. Configure `BETTER_AUTH_URL=https://webhooks.mubashirhussain.dev`, the auth secret and GitHub credentials, and register `https://webhooks.mubashirhussain.dev/api/auth/callback/github` in the GitHub OAuth app.
-
-The build generates Prisma Client first. Only when `VERCEL_ENV=production`, it checks database identity using a temporary transaction-scoped advisory lock, checks tables against completed migration history, applies committed migrations, and checks again before building Next.js. Different pooled/direct hostnames are supported. Both connections need access to PostgreSQL advisory locks; connection failure or any migration/preflight failure stops deployment. Migrations are additive but are not rolled back if the later application build fails.
-
-Preview and ordinary local builds never apply migrations automatically. Provision preview databases separately and do not give previews production database credentials. Do not promote a preview built without this production migration step directly to production; trigger a production build.
-
-### Missing auth tables / P2021
-
-If GitHub sign-in reports that `public.verifications` does not exist, inspect the production database URLs and migration status with `pnpm --filter @rwp/web exec prisma migrate status` using production-scoped `DIRECT_URL`. Deploy using the production build above to apply the existing foundation migration. Prisma CLI reads `DIRECT_URL`; the running app reads `DATABASE_URL`. Never paste credentials into logs or issue reports.
-
-If completed migration history references missing tables, the build reports schema drift and stops. Recover from the appropriate backup or prepare a reviewed, targeted repair based on the actual database state. Do not run `migrate reset`, edit applied migration files, or mark missing migrations as applied. An SSL-mode warning is separate from a missing-table error.
-
-After release, click Continue with GitHub and confirm the social endpoint no longer returns 500. Complete OAuth and verify the session and dashboard/onboarding flow. A local test cannot validate production GitHub credentials or the live callback configuration.
-
-### Better Auth callback compatibility
-
-Better Auth and its Prisma adapter are pinned together at 1.7.3. Versions 1.7.0–1.7.2 queried an account `issuer` field; 1.7.3 uses the existing `(providerId, accountId)` key again. Keep the committed schema and regenerate Prisma Client during deployment. See the [official upgrade guide](https://better-auth.com/docs/guides/1-7-upgrade-guide).
-
-The production preflight inspects `public.accounts` for a manually added required `issuer` column. If found, it stops the release with a repair instruction. After confirming the live column and reviewing the database state, commit a migration containing `ALTER TABLE public.accounts ALTER COLUMN issuer DROP NOT NULL;` and apply it with the existing `pnpm db:deploy` command before retrying the production build. Preserve the column's data and the existing `(providerId, accountId)` unique constraint. No issuer migration is needed for the repository's current schema.
-
-The favicon reuses the Lucide webhook mark in `apps/web/src/app/icon.svg`; `favicon.ico` contains matching 16, 32, and 48 pixel images. Next.js supplies favicon metadata for every page automatically.
-
-## M2 durable delivery
-
-Session-authenticated event ingestion, PostgreSQL outbox dispatch, signed delivery, retries, and crash recovery are documented in [the M2 runbook](docs/m2-delivery.md). Run the local worker with `pnpm --filter @rwp/web worker`.
-
-## Using the signed-in workspace
-
-The workspace has Overview, Endpoints, Events, Deliveries, and Setup guide navigation. Follow [Add and verify your webhook](docs/webhook-workspace.md) to register a receiver, save its secret, send an event, and verify its signature.
-
-## M3 operations
-
-Inspect delivery history, attempts, retry schedules, and confirmed replays in the dashboard. See [M3 — Operations UI](docs/m3-operations.md) for routes, replay semantics, local demonstrations, and verification.
-
-## Guarantees and lifecycle
-
-The project demonstrates persistence boundaries, concurrency, tenant isolation and recovery in asynchronous integrations.
-
-```text
-Producer → Event API → PostgreSQL transaction (Event + Delivery + Outbox)
-                                     ↓
-                              Publisher → QStash → Processor → Destination
-                                                       ↓
-                                              Immutable attempt outcome
-                                                       ↓
-                                         Success / durable retry / terminal state
+```sh
+docker compose up -d postgres
+pnpm db:generate
+pnpm db:deploy
+pnpm dev
 ```
 
-A 202 means work is durably committed. Delivery is **at least once**: a crash after receipt but before success persistence can cause duplicate requests. Consumers should atomically deduplicate `webhook-id` with their business update. There is no exactly-once or eventual-success promise.
+Run `pnpm --filter @rwp/web worker` in another configured shell. The app uses `http://localhost:3000`; the development receiver uses `http://localhost:4000`. PostgreSQL defaults to port `54329`.
 
-Automatic retries use at most five attempts within 24 hours, equal-jitter exponential delays and bounded Retry-After. Replay creates a new delivery using the original event and current endpoint configuration, preserving all prior attempts. See [retry details](docs/m2-delivery.md) and [replay semantics](docs/m3-operations.md).
+Endpoint registration still requires public HTTPS; the local HTTP receiver serves the [isolated demo harness](docs/demo.md). See the [workspace guide](docs/webhook-workspace.md) for your first delivery and the [deployment runbook](docs/m4-operations.md#vercel-production-deployment) for hosting.
 
-## API and security
+## Design trade-offs and next steps
 
-Sessions supply tenant context; mutations require the configured Origin. Main routes are `/v1/endpoints`, `/api/events`, `/api/deliveries` and `/api/deliveries/:id/replay`. [OpenAPI](docs/openapi.json) documents the contract. Producer API-key authentication remains future work.
+- **Modular monolith:** keeps acceptance transactional and deployment small; independent service scaling awaits measured demand.
+- **Outbox and application retries:** make failures recoverable and auditable, with extra persistence and recovery work.
+- **PostgreSQL limits and metrics:** avoid additional infrastructure; global acceptance locks and shared aggregates constrain scaling.
+- **Bounded delivery and retained history:** control retry cost and preserve evidence; prolonged outages can exhaust work, and retention needs explicit management.
 
-Signing secrets use versioned AES-256-GCM and are shown once at creation/rotation. Outbound bodies use HMAC-SHA256; see [verification](docs/signing.md). QStash verifies exact bodies and callback URLs. Destinations require public HTTPS port 443 addresses, checked again when connecting. Redirects are not followed and response bodies are not stored.
+V1 deliberately uses one owner/workspace per account and conservative demo quotas. Future work includes producer API keys, automated history retention, richer analytics/export, and measured scaling beyond those quotas. Hosted acceptance remains a separate verification gate.
 
-## Operations, demonstrations and roadmap
+Further reading: [Architecture](docs/architecture.md) · [Design decisions](docs/adr) · [Signing](docs/signing.md) · [Operations UI and replay](docs/m3-operations.md) · [Metrics, limits, and deployment](docs/m4-operations.md)
 
-- [M4 operations](docs/m4-operations.md): limits, logs, durable metrics, readiness and production verification.
-- [Portfolio demonstration](docs/demo.md): retry, process restart, exhaustion and replay.
-- [Load testing](docs/load-testing.md): repeatable workload and measurement limits.
-- [Architecture](docs/architecture.md): design choices and trade-offs.
-
-M0–M3 functionality is retained. M4/v1 sign-off requires the [acceptance evidence](docs/reviews/m4-v1-hardening.md), including hosted verification. Future work includes retention, producer API keys, richer analytics and scaling beyond public-demo quotas.
+[MIT license](LICENSE)
